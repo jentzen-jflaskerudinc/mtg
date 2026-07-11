@@ -22,7 +22,6 @@
   }
   #stage { position: relative; width: 100vw; height: 100vh; }
 
-  /* ---- 4 floating boxes ---- */
   #grid {
     position: absolute; inset: 0;
     display: grid; gap: 2.6vh; padding: 2.6vh;
@@ -43,7 +42,6 @@
   }
   .player.dead .art { filter: grayscale(1) brightness(.45); }
 
-  /* name pill, top center */
   .player .name {
     position: absolute; top: 2vh; left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,.8); border-radius: 12px; padding: .9vh 1.8vw;
@@ -52,7 +50,6 @@
   }
   .player .name .crown { color: var(--gold); }
 
-  /* big life number, toward screen center */
   .player .life {
     position: absolute; top: 52%; transform: translateY(-50%);
     font-size: 19vh; font-weight: 300; line-height: 1; color: #fff;
@@ -64,7 +61,6 @@
   .player .life.bump { animation: bump .4s ease; }
   @keyframes bump { 40% { transform: translateY(-50%) scale(1.15); } }
 
-  /* commander damage sub-box, outer edge */
   .player .subbox {
     position: absolute; top: 55%; transform: translateY(-50%);
     background: rgba(0,0,0,.78); border-radius: 16px; padding: 1.1vh;
@@ -86,12 +82,18 @@
   }
   .tile.lethal .d { color: var(--danger); }
 
+  .player .cname {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 1vh;
+    font-size: 1.9vh; color: #d9dbe0; background: rgba(0,0,0,.72);
+    border-radius: 10px; padding: .4vh 1.2vw; max-width: 85%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
   .player .offline {
     position: absolute; top: 2vh; right: 1.5vw; font-size: 1.8vh; color: var(--danger);
     background: rgba(0,0,0,.8); padding: .5vh 1vw; border-radius: 10px;
   }
 
-  /* slim turn pill, bottom center */
   #turnPill {
     position: absolute; bottom: .4vh; left: 50%; transform: translateX(-50%);
     z-index: 6; background: rgba(0,0,0,.85); border-radius: 14px 14px 0 0;
@@ -100,8 +102,10 @@
   }
   #turnPill b { color: #fff; font-weight: 700; }
   #turnPill .crown { color: var(--gold); }
+  #turnPill .timer { color: #fff; font-variant-numeric: tabular-nums; }
+  #turnPill .timer.low { color: var(--danger); font-weight: 700; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
 
-  /* ---- empty / join state ---- */
   #joinBox {
     position: absolute; inset: 0; z-index: 10; background: var(--bg);
     display: none; flex-direction: column; align-items: center; justify-content: center; gap: 3vh;
@@ -132,8 +136,9 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   let ws, reconnectDelay = 500;
-  let game = { players: {}, turnOrder: [], activeIdx: 0, turnNumber: 1 };
+  let game = { players: {}, turnOrder: [], activeIdx: 0, turnNumber: 1, timer: { votes: [], running: false, endsAt: 0, duration: 120 } };
   let prevLife = {};
+  let clockOffset = 0;
 
   const joinUrl = location.origin.replace(/^https?:\/\//, '');
   $('joinUrl').textContent = joinUrl;
@@ -156,6 +161,7 @@
       const msg = JSON.parse(ev.data);
       if (msg.type === 'welcome' || msg.type === 'state') {
         game = msg.state;
+        if (game.now) clockOffset = game.now - Date.now();
         render();
       }
     };
@@ -165,10 +171,46 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // life on the side toward screen center; sub-box toward the outer edge
   function isFlipped(i, n) {
     const cols = n <= 2 ? n : (n <= 4 ? 2 : 3);
     return (i % cols) === cols - 1 && cols > 1;
+  }
+
+  function fmt(s) {
+    const m = Math.floor(Math.max(s, 0) / 60), r = Math.max(s, 0) % 60;
+    return `${m}:${String(r).padStart(2, '0')}`;
+  }
+
+  function timerHtml() {
+    const t = game.timer;
+    if (!t) return '';
+    if (t.running) {
+      const rem = Math.round((t.endsAt - (Date.now() + clockOffset)) / 1000);
+      const low = rem <= 10;
+      return `<span class="timer${low ? ' low' : ''}">⏱ ${rem <= 0 ? 'TIME!' : fmt(rem)}</span>`;
+    }
+    if (t.votes.length > 0) {
+      const majority = Math.floor(game.turnOrder.length / 2) + 1;
+      return `<span class="timer">⏱ vote ${t.votes.length}/${majority}</span>`;
+    }
+    return '';
+  }
+
+  setInterval(() => {
+    if (game.turnOrder.length > 0 && game.timer && game.timer.running) renderPill();
+  }, 500);
+
+  function renderPill() {
+    const ids = game.turnOrder;
+    const n = ids.length;
+    if (n === 0) return;
+    const act = game.players[ids[game.activeIdx]];
+    const next = game.players[ids[(game.activeIdx + 1) % n]];
+    $('turnPill').innerHTML =
+      `<span>Turn ${game.turnNumber}</span>` +
+      `<span><span class="crown">👑</span> <b>${esc(act ? act.name : '')}</b></span>` +
+      `<span>next: ${esc(next ? next.name : '')}</span>` +
+      timerHtml();
   }
 
   function render() {
@@ -201,7 +243,8 @@
           return `<div class="tile${d >= 21 ? ' lethal' : ''}" style="background-image:url('${o && o.commander && o.commander.art ? o.commander.art : ''}')">
             <div class="d">${d}</div>
           </div>`;
-        }).join('')}</div>`;
+        }).join('')}</div>
+        <div class="cname">${esc(p.commander ? p.commander.name : '')}</div>`;
       grid.appendChild(div);
 
       if (prevLife[id] !== undefined && prevLife[id] !== p.life) {
@@ -211,14 +254,7 @@
       prevLife[id] = p.life;
     });
 
-    if (n > 0) {
-      const act = game.players[ids[game.activeIdx]];
-      const next = game.players[ids[(game.activeIdx + 1) % n]];
-      $('turnPill').innerHTML =
-        `<span>Turn ${game.turnNumber}</span>` +
-        `<span><span class="crown">👑</span> <b>${esc(act ? act.name : '')}</b></span>` +
-        `<span>next: ${esc(next ? next.name : '')}</span>`;
-    }
+    renderPill();
   }
 
   connect();
