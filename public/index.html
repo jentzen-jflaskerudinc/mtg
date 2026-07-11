@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>MTG Life Tracker</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MTG Life">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <style>
   :root {
     --bg: #000;
@@ -89,6 +96,13 @@
     font-size: 13px; color: var(--muted); white-space: nowrap;
   }
   #turnBanner.you { color: #ffd76a; font-weight: 700; }
+  #turnBanner.expired { color: var(--danger); font-weight: 700; }
+  #timerVotePill {
+    position: absolute; top: calc(max(10px, env(safe-area-inset-top)) + 42px); left: 50%; transform: translateX(-50%);
+    z-index: 3; pointer-events: none; display: none;
+    background: rgba(0,0,0,.72); border-radius: 16px; padding: 5px 14px;
+    font-size: 12px; color: #ffd76a; white-space: nowrap;
+  }
   #deltaFloat {
     position: absolute; top: 24%; left: 50%; transform: translateX(-50%); z-index: 3;
     font-size: 34px; font-weight: 300; color: #fff; pointer-events: none;
@@ -98,7 +112,7 @@
 
   .bar {
     position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
-    display: flex; gap: 10px; padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    display: flex; gap: 8px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
     background: linear-gradient(180deg, transparent, rgba(0,0,0,.85) 40%);
   }
   .bar button {
@@ -107,16 +121,17 @@
   }
   #endTurnBtn { flex: 1; background: var(--blue); }
   #endTurnBtn:disabled { background: rgba(255,255,255,.1); color: var(--muted); }
-  #cmdBtn, #gearGame { width: 58px; font-size: 20px; font-weight: 400; }
+  #cmdBtn, #gearGame, #timerBtn, #playersBtn { width: 50px; font-size: 19px; font-weight: 400; }
+  #timerBtn.voted { background: #7a5c17; }
 
-  #cmdSheet {
+  .sheet {
     position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
     background: #0e1016; border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
     transform: translateY(105%); transition: transform .25s ease;
-    max-height: 70%; overflow-y: auto;
+    max-height: 75%; overflow-y: auto;
   }
-  #cmdSheet.open { transform: translateY(0); }
-  #cmdSheet h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .sheet.open { transform: translateY(0); }
+  .sheet h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
   .cmdRow {
     display: flex; align-items: center; gap: 10px; background: var(--panel);
     border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
@@ -131,6 +146,20 @@
     width: 44px; height: 44px; font-size: 22px; font-weight: 400; border: none; border-radius: 10px;
     color: #fff; cursor: pointer; background: rgba(255,255,255,.12);
   }
+
+  .cmdrGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cmdrGrid .cc { text-align: center; cursor: pointer; }
+  .cmdrGrid img { width: 100%; border-radius: 4.5% / 3.5%; display: block; }
+  .cmdrGrid .nm { font-size: 12px; color: var(--muted); margin-top: 5px; }
+  .cmdrGrid .cn { font-size: 13px; font-weight: 600; margin-top: 2px; }
+
+  #cardZoom {
+    position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.92);
+    display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px;
+  }
+  #cardZoom.open { display: flex; }
+  #cardZoom img { max-width: 92vw; max-height: 84vh; border-radius: 4.5% / 3.5%; }
+  #cardZoom .who { color: var(--muted); font-size: 14px; }
 
   #masterScreen { padding: 24px 20px; max-width: 480px; margin: 0 auto; }
   .mRow { background: var(--panel); border-radius: 14px; padding: 12px; margin-bottom: 10px; position: relative; overflow: hidden; }
@@ -154,7 +183,7 @@
     opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 99;
   }
   .toast.show { opacity: 1; }
-  .connDot { position: fixed; top: 12px; right: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); z-index: 98; }
+  .connDot { position: fixed; top: max(12px, env(safe-area-inset-top)); right: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); z-index: 98; }
   .connDot.on { background: #27ae60; }
 </style>
 </head>
@@ -185,17 +214,26 @@
     <div class="pill" id="myName"></div>
   </div>
   <div id="turnBanner">Waiting…</div>
+  <div id="timerVotePill"></div>
   <div id="deltaFloat"></div>
   <div class="bar">
     <button id="endTurnBtn" disabled>End Turn</button>
+    <button id="timerBtn" title="Vote for turn timer">⏱</button>
+    <button id="playersBtn" title="Commanders">👥</button>
     <button id="cmdBtn" title="Commander damage">⚔</button>
     <button id="gearGame" title="Master">⚙</button>
   </div>
-  <div id="cmdSheet">
+  <div class="sheet" id="cmdSheet">
     <h2>Commander damage taken</h2>
     <div id="cmdDmgList"></div>
     <button class="btn secondary" id="cmdClose" style="margin-top:8px">Close</button>
   </div>
+  <div class="sheet" id="cmdrSheet">
+    <h2>Commanders in this game</h2>
+    <div class="cmdrGrid" id="cmdrGrid"></div>
+    <button class="btn secondary" id="cmdrClose" style="margin-top:14px">Close</button>
+  </div>
+  <div id="cardZoom"><img id="zoomImg" alt=""><div class="who" id="zoomWho"></div></div>
 </div>
 
 <!-- MASTER SCREEN -->
@@ -208,6 +246,10 @@
     <button style="background:#7a5c17" id="mResetLife">Reset Life</button>
     <button style="background:#4a1f1f" id="mNewGame">New Game</button>
   </div>
+  <div class="mGlobal">
+    <button style="background:#155e4c" id="mTimerStart">Timer 2:00</button>
+    <button style="background:#3d3d46" id="mTimerStop">Timer Off</button>
+  </div>
   <button class="btn secondary" id="masterBack">← Back</button>
 </div>
 
@@ -218,12 +260,18 @@
   const $ = (id) => document.getElementById(id);
   const store = window.localStorage;
 
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
   let ws = null, wsOk = false, reconnectDelay = 500;
-  let game = { players: {}, turnOrder: [], activeIdx: 0, turnNumber: 1 };
+  let game = { players: {}, turnOrder: [], activeIdx: 0, turnNumber: 1, timer: { votes: [], running: false, endsAt: 0, duration: 120 } };
   let myId = store.getItem('playerId') || null;
   let masterPin = store.getItem('masterPin') || null;
   let masterMode = false;
   let chosenCommander = null;
+  let clockOffset = 0;
+  let lastExpiredAt = 0;
 
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -243,6 +291,7 @@
       const msg = JSON.parse(ev.data);
       if (msg.type === 'welcome') {
         game = msg.state;
+        if (game.now) clockOffset = game.now - Date.now();
         if (msg.playerId && game.players[msg.playerId]) {
           myId = msg.playerId;
           showScreen(masterMode ? 'masterScreen' : 'gameScreen');
@@ -254,6 +303,7 @@
         showScreen('gameScreen');
       } else if (msg.type === 'state') {
         game = msg.state;
+        if (game.now) clockOffset = game.now - Date.now();
         if (myId && !game.players[myId]) {
           myId = null; store.removeItem('playerId');
           showScreen('joinScreen');
@@ -365,8 +415,22 @@
   bindZone($('tapMinus'), -1);
 
   $('endTurnBtn').onclick = () => sendMsg({ type: 'endTurn', playerId: myId });
+  $('timerBtn').onclick = () => {
+    if (game.timer && game.timer.running) { toast('Timer already running'); return; }
+    sendMsg({ type: 'timerVote', playerId: myId });
+  };
   $('cmdBtn').onclick = () => $('cmdSheet').classList.add('open');
   $('cmdClose').onclick = () => $('cmdSheet').classList.remove('open');
+  $('playersBtn').onclick = () => $('cmdrSheet').classList.add('open');
+  $('cmdrClose').onclick = () => $('cmdrSheet').classList.remove('open');
+  $('cardZoom').onclick = () => $('cardZoom').classList.remove('open');
+
+  function zoomCard(p) {
+    if (!p || !p.commander || !p.commander.image) return;
+    $('zoomImg').src = p.commander.image;
+    $('zoomWho').textContent = `${p.commander.name} — ${p.name}`;
+    $('cardZoom').classList.add('open');
+  }
 
   function promptMaster() {
     if (masterPin) { sendMsg({ type: 'master', pin: masterPin, action: 'auth' }); return; }
@@ -388,6 +452,44 @@
   $('mEndTurn').onclick = () => mAct('endTurn');
   $('mResetLife').onclick = () => { if (confirm('Reset everyone to 40 life?')) mAct('resetLife'); };
   $('mNewGame').onclick = () => { if (confirm('Wipe ALL players and start a new game?')) mAct('newGame'); };
+  $('mTimerStart').onclick = () => mAct('timerStart', { seconds: 120 });
+  $('mTimerStop').onclick = () => mAct('timerStop');
+
+  // ---------- timer ticking ----------
+  function timerRemaining() {
+    if (!game.timer || !game.timer.running) return null;
+    return Math.round((game.timer.endsAt - (Date.now() + clockOffset)) / 1000);
+  }
+  function fmt(s) {
+    const m = Math.floor(Math.max(s, 0) / 60), r = Math.max(s, 0) % 60;
+    return `${m}:${String(r).padStart(2, '0')}`;
+  }
+  setInterval(() => {
+    if (!myId || !game.players[myId]) return;
+    updateBanner();
+    const rem = timerRemaining();
+    if (rem !== null && rem <= 0 && game.timer.endsAt !== lastExpiredAt) {
+      lastExpiredAt = game.timer.endsAt;
+      if (activeId() === myId && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    }
+  }, 500);
+
+  function updateBanner() {
+    const me = myId ? game.players[myId] : null;
+    if (!me) return;
+    const act = game.players[activeId()];
+    const myTurn = activeId() === myId;
+    const banner = $('turnBanner');
+    const rem = timerRemaining();
+    const expired = rem !== null && rem <= 0;
+    banner.classList.toggle('you', myTurn && !expired);
+    banner.classList.toggle('expired', expired && myTurn);
+    let text = !act ? 'Waiting for players…'
+      : myTurn ? `👑 YOUR TURN · ${game.turnNumber}`
+      : `${act.name}'s turn · ${game.turnNumber}`;
+    if (rem !== null) text += expired ? ' · ⏱ TIME!' : ` · ⏱ ${fmt(rem)}`;
+    banner.textContent = text;
+  }
 
   function render() {
     const me = myId ? game.players[myId] : null;
@@ -397,15 +499,22 @@
       $('myLife').textContent = me.life;
       $('lifeArt').style.backgroundImage = me.commander && me.commander.art ? `url(${me.commander.art})` : 'none';
 
-      const act = game.players[activeId()];
-      const myTurn = activeId() === myId;
-      const banner = $('turnBanner');
-      banner.classList.toggle('you', myTurn);
-      banner.textContent = !act ? 'Waiting for players…'
-        : myTurn ? `👑 YOUR TURN · ${game.turnNumber}`
-        : `${act.name}'s turn · ${game.turnNumber}`;
-      $('endTurnBtn').disabled = !myTurn;
+      updateBanner();
+      $('endTurnBtn').disabled = activeId() !== myId;
 
+      // timer vote UI
+      const t = game.timer || { votes: [], running: false };
+      const votePill = $('timerVotePill');
+      const majority = Math.floor(game.turnOrder.length / 2) + 1;
+      if (!t.running && t.votes.length > 0) {
+        votePill.style.display = 'block';
+        votePill.textContent = `⏱ timer vote: ${t.votes.length}/${majority}`;
+      } else {
+        votePill.style.display = 'none';
+      }
+      $('timerBtn').classList.toggle('voted', t.votes.includes(myId));
+
+      // commander damage rows
       const list = $('cmdDmgList');
       list.innerHTML = '';
       game.turnOrder.filter((id) => id !== myId).forEach((oppId) => {
@@ -420,9 +529,26 @@
           <button class="m">−</button>
           <div class="dmg ${dmg >= 21 ? 'lethal' : ''}">${dmg}</div>
           <button class="p">+</button>`;
+        row.querySelector('img').onclick = () => zoomCard(opp);
         row.querySelector('.m').onclick = () => sendMsg({ type: 'cmdDamage', playerId: myId, fromId: oppId, delta: -1 });
         row.querySelector('.p').onclick = () => sendMsg({ type: 'cmdDamage', playerId: myId, fromId: oppId, delta: 1 });
         list.appendChild(row);
+      });
+
+      // commanders gallery (all players, incl. me)
+      const grid = $('cmdrGrid');
+      grid.innerHTML = '';
+      game.turnOrder.forEach((id) => {
+        const p = game.players[id];
+        if (!p) return;
+        const cc = document.createElement('div');
+        cc.className = 'cc';
+        cc.innerHTML = `
+          <img src="${p.commander && p.commander.image ? p.commander.image : ''}" onerror="this.style.visibility='hidden'">
+          <div class="cn">${esc(p.commander ? p.commander.name : '?')}</div>
+          <div class="nm">${esc(p.name)}${id === myId ? ' (you)' : ''}</div>`;
+        cc.onclick = () => zoomCard(p);
+        grid.appendChild(cc);
       });
     }
 
