@@ -15,7 +15,7 @@ const { WebSocketServer, WebSocket } = require('ws');
 const MASTER_PIN = process.env.MASTER_PIN || '1234';
 const STARTING_LIFE = 40;
 const MAX_PLAYERS = 6;
-const DEFAULT_TIMER_SECONDS = 120;
+const DEFAULT_TIMER_SECONDS = 300;
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
