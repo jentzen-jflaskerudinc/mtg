@@ -15,6 +15,7 @@ const { WebSocketServer, WebSocket } = require('ws');
 const MASTER_PIN = process.env.MASTER_PIN || '1234';
 const STARTING_LIFE = 40;
 const MAX_PLAYERS = 6;
+const DEFAULT_TIMER_SECONDS = 120;
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
@@ -33,6 +34,7 @@ function newGameState() {
     turnOrder: [],    // array of player ids
     activeIdx: 0,
     turnNumber: 1,
+    timer: { votes: [], running: false, endsAt: 0, duration: DEFAULT_TIMER_SECONDS },
     startedAt: Date.now(),
   };
 }
@@ -43,6 +45,8 @@ function publicState() {
     turnOrder: state.turnOrder,
     activeIdx: state.activeIdx,
     turnNumber: state.turnNumber,
+    timer: state.timer,
+    now: Date.now(),
   };
 }
 
@@ -86,6 +90,33 @@ function advanceTurn() {
   if (state.turnOrder.length === 0) return;
   state.activeIdx = (state.activeIdx + 1) % state.turnOrder.length;
   if (state.activeIdx === 0) state.turnNumber += 1;
+  if (state.timer.running) {
+    state.timer.endsAt = Date.now() + state.timer.duration * 1000;
+  }
+}
+
+function startTimer(seconds) {
+  state.timer.duration = clampInt(seconds || state.timer.duration, 10, 3600);
+  state.timer.running = true;
+  state.timer.votes = [];
+  state.timer.endsAt = Date.now() + state.timer.duration * 1000;
+}
+
+function stopTimer() {
+  state.timer.running = false;
+  state.timer.votes = [];
+  state.timer.endsAt = 0;
+}
+
+function toggleTimerVote(playerId) {
+  if (!state.players[playerId] || state.timer.running) return false;
+  const i = state.timer.votes.indexOf(playerId);
+  if (i === -1) state.timer.votes.push(playerId);
+  else state.timer.votes.splice(i, 1);
+  // strict majority of current players starts the timer
+  const majority = Math.floor(state.turnOrder.length / 2) + 1;
+  if (state.timer.votes.length >= majority) startTimer();
+  return true;
 }
 
 function removePlayer(targetId) {
@@ -100,6 +131,7 @@ function removePlayer(targetId) {
     }
   }
   for (const p of Object.values(state.players)) delete p.cmdDamage[targetId];
+  state.timer.votes = state.timer.votes.filter((id) => id !== targetId);
   return true;
 }
 
@@ -147,6 +179,12 @@ function handleMaster(ws, msg) {
     case 'removePlayer':
       removePlayer(msg.targetId);
       break;
+    case 'timerStart':
+      startTimer(msg.seconds);
+      break;
+    case 'timerStop':
+      stopTimer();
+      break;
     case 'resetLife':
       for (const p of Object.values(state.players)) {
         p.life = STARTING_LIFE;
@@ -154,6 +192,7 @@ function handleMaster(ws, msg) {
       }
       state.activeIdx = 0;
       state.turnNumber = 1;
+      stopTimer();
       break;
     case 'newGame':
       state = newGameState();
@@ -248,6 +287,13 @@ wss.on('connection', (ws) => {
         const activeId = state.turnOrder[state.activeIdx];
         if (ws.playerId && ws.playerId === activeId) {
           advanceTurn();
+          broadcast();
+        }
+        break;
+      }
+
+      case 'timerVote': {
+        if (ws.playerId && ws.playerId === msg.playerId && toggleTimerVote(msg.playerId)) {
           broadcast();
         }
         break;
