@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MTG Life Tracker</title>
+<style>
+  :root {
+    --bg: #000;
+    --panel: #171a22;
+    --panel2: #1f2430;
+    --text: #fff;
+    --muted: #9aa0ad;
+    --gold: #d4af37;
+    --blue: #2980b9;
+    --danger: #e74c3c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none; user-select: none; -webkit-user-select: none;
+  }
+  .screen { display: none; min-height: 100%; }
+  .screen.active { display: block; }
+
+  #joinScreen { padding: 24px 20px; max-width: 480px; margin: 0 auto; }
+  h1 { font-size: 22px; text-align: center; color: var(--gold); margin-bottom: 4px; letter-spacing: 2px; font-weight: 300; }
+  .sub { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 16px 0 6px; }
+  input[type=text] {
+    width: 100%; padding: 14px; font-size: 17px; border-radius: 12px;
+    border: 1px solid #2c3240; background: var(--panel); color: var(--text); outline: none;
+  }
+  input:focus { border-color: var(--gold); }
+  .btn {
+    display: block; width: 100%; padding: 16px; font-size: 18px; font-weight: 700;
+    border: none; border-radius: 14px; cursor: pointer; margin-top: 20px;
+    background: var(--gold); color: #14120a;
+  }
+  .btn:disabled { opacity: .4; }
+  .btn.secondary { background: var(--panel2); color: var(--text); font-weight: 600; }
+  #results { margin-top: 6px; border-radius: 12px; overflow: hidden; }
+  #results div { padding: 12px 14px; background: var(--panel2); border-bottom: 1px solid #12151d; font-size: 16px; cursor: pointer; }
+  #results div:active { background: #2a3140; }
+  #cmdPreview { display: none; margin-top: 14px; text-align: center; }
+  #cmdPreview img { width: 65%; border-radius: 12px; }
+  #cmdPreview p { margin-top: 6px; color: var(--gold); font-size: 15px; }
+  .gearBar { text-align: center; margin-top: 26px; }
+  .gearBar button { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px; }
+
+  #gameScreen { position: fixed; inset: 0; overflow: hidden; }
+  #lifeArt {
+    position: absolute; inset: 0; background-size: cover; background-position: center 20%;
+    background-color: #12151d;
+  }
+  #lifeArt::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.18); }
+  .tapZone {
+    position: absolute; left: 0; right: 0; height: 38%;
+    display: flex; justify-content: center; z-index: 2;
+    color: #fff; font-size: 44px; font-weight: 200;
+    text-shadow: 0 2px 10px rgba(0,0,0,.9);
+    touch-action: none; cursor: pointer;
+  }
+  .tapZone.top { top: 0; align-items: flex-start; padding-top: max(52px, env(safe-area-inset-top)); }
+  .tapZone.bottom { bottom: 0; align-items: flex-end; padding-bottom: 86px; }
+  .tapZone:active { background: rgba(255,255,255,.08); }
+  .hud {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  }
+  #myLife {
+    font-size: 34vh; line-height: .9; font-weight: 200; color: #fff;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 24px rgba(0,0,0,.85), 0 4px 16px rgba(0,0,0,.9);
+  }
+  #myLife.bump { animation: bump .3s ease; }
+  @keyframes bump { 40% { transform: scale(1.08); } }
+  .pill {
+    background: rgba(0,0,0,.72); border-radius: 12px; padding: 8px 18px;
+    font-size: 16px; font-weight: 600; backdrop-filter: blur(4px);
+  }
+  #myName { color: #fff; }
+  #turnBanner {
+    position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    z-index: 3; pointer-events: none;
+    background: rgba(0,0,0,.72); border-radius: 20px; padding: 7px 16px;
+    font-size: 13px; color: var(--muted); white-space: nowrap;
+  }
+  #turnBanner.you { color: #ffd76a; font-weight: 700; }
+  #deltaFloat {
+    position: absolute; top: 24%; left: 50%; transform: translateX(-50%); z-index: 3;
+    font-size: 34px; font-weight: 300; color: #fff; pointer-events: none;
+    text-shadow: 0 2px 10px #000; opacity: 0; transition: opacity .25s;
+  }
+  #deltaFloat.show { opacity: 1; }
+
+  .bar {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+    display: flex; gap: 10px; padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,.85) 40%);
+  }
+  .bar button {
+    border: none; border-radius: 14px; padding: 14px 0; font-size: 15px; font-weight: 700;
+    cursor: pointer; color: #fff; background: rgba(255,255,255,.14); backdrop-filter: blur(6px);
+  }
+  #endTurnBtn { flex: 1; background: var(--blue); }
+  #endTurnBtn:disabled { background: rgba(255,255,255,.1); color: var(--muted); }
+  #cmdBtn, #gearGame { width: 58px; font-size: 20px; font-weight: 400; }
+
+  #cmdSheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+    background: #0e1016; border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    transform: translateY(105%); transition: transform .25s ease;
+    max-height: 70%; overflow-y: auto;
+  }
+  #cmdSheet.open { transform: translateY(0); }
+  #cmdSheet h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .cmdRow {
+    display: flex; align-items: center; gap: 10px; background: var(--panel);
+    border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+  }
+  .cmdRow img { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; }
+  .cmdRow .info { flex: 1; min-width: 0; }
+  .cmdRow .info .n { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cmdRow .info .c { font-size: 12px; color: var(--muted); }
+  .cmdRow .dmg { font-size: 22px; font-weight: 300; width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+  .cmdRow .dmg.lethal { color: var(--danger); }
+  .cmdRow button {
+    width: 44px; height: 44px; font-size: 22px; font-weight: 400; border: none; border-radius: 10px;
+    color: #fff; cursor: pointer; background: rgba(255,255,255,.12);
+  }
+
+  #masterScreen { padding: 24px 20px; max-width: 480px; margin: 0 auto; }
+  .mRow { background: var(--panel); border-radius: 14px; padding: 12px; margin-bottom: 10px; position: relative; overflow: hidden; }
+  .mRow .artbg { position: absolute; inset: 0; background-size: cover; background-position: center 20%; opacity: .22; }
+  .mRow .top { position: relative; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .mRow img { width: 38px; height: 38px; border-radius: 8px; object-fit: cover; }
+  .mRow .nm { flex: 1; font-weight: 700; }
+  .mRow .lf { font-size: 28px; font-weight: 300; font-variant-numeric: tabular-nums; }
+  .mRow .ctrls { position: relative; display: flex; gap: 6px; flex-wrap: wrap; }
+  .mRow .ctrls button {
+    flex: 1; min-width: 52px; padding: 10px 0; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 700; color: #fff; cursor: pointer; background: rgba(255,255,255,.12);
+  }
+  .mRow .ctrls .act { background: var(--blue); } .mRow .ctrls .rm { background: #4a1f1f; color: #e08a8a; }
+  .mGlobal { display: flex; gap: 8px; margin-top: 14px; }
+  .mGlobal button { flex: 1; padding: 14px 0; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; color: #fff; }
+
+  .toast {
+    position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.85); padding: 10px 18px; border-radius: 12px; font-size: 14px;
+    opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 99;
+  }
+  .toast.show { opacity: 1; }
+  .connDot { position: fixed; top: 12px; right: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); z-index: 98; }
+  .connDot.on { background: #27ae60; }
+</style>
+</head>
+<body>
+<div class="connDot" id="connDot"></div>
+
+<!-- JOIN SCREEN -->
+<div class="screen active" id="joinScreen">
+  <h1>⚔️ COMMANDER</h1>
+  <p class="sub">Life tracker · 40 life</p>
+  <label>Your name</label>
+  <input type="text" id="nameInput" placeholder="e.g. Jentzen" maxlength="24" autocomplete="off">
+  <label>Your commander</label>
+  <input type="text" id="cmdInput" placeholder="Start typing a card name…" autocomplete="off">
+  <div id="results"></div>
+  <div id="cmdPreview"><img id="cmdImg" alt=""><p id="cmdName"></p></div>
+  <button class="btn" id="joinBtn" disabled>Join Game</button>
+  <div class="gearBar"><button id="gearJoin">⚙ master / TV link</button></div>
+</div>
+
+<!-- GAME SCREEN: full-bleed commander art -->
+<div class="screen" id="gameScreen">
+  <div id="lifeArt"></div>
+  <div class="tapZone top" id="tapPlus">+</div>
+  <div class="tapZone bottom" id="tapMinus">−</div>
+  <div class="hud">
+    <div id="myLife">40</div>
+    <div class="pill" id="myName"></div>
+  </div>
+  <div id="turnBanner">Waiting…</div>
+  <div id="deltaFloat"></div>
+  <div class="bar">
+    <button id="endTurnBtn" disabled>End Turn</button>
+    <button id="cmdBtn" title="Commander damage">⚔</button>
+    <button id="gearGame" title="Master">⚙</button>
+  </div>
+  <div id="cmdSheet">
+    <h2>Commander damage taken</h2>
+    <div id="cmdDmgList"></div>
+    <button class="btn secondary" id="cmdClose" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
+<!-- MASTER SCREEN -->
+<div class="screen" id="masterScreen">
+  <h1>🛡 MASTER</h1>
+  <p class="sub">Full control over all players</p>
+  <div id="masterList"></div>
+  <div class="mGlobal">
+    <button style="background:var(--blue)" id="mEndTurn">Force End Turn</button>
+    <button style="background:#7a5c17" id="mResetLife">Reset Life</button>
+    <button style="background:#4a1f1f" id="mNewGame">New Game</button>
+  </div>
+  <button class="btn secondary" id="masterBack">← Back</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const store = window.localStorage;
+
+  let ws = null, wsOk = false, reconnectDelay = 500;
+  let game = { players: {}, turnOrder: [], activeIdx: 0, turnNumber: 1 };
+  let myId = store.getItem('playerId') || null;
+  let masterPin = store.getItem('masterPin') || null;
+  let masterMode = false;
+  let chosenCommander = null;
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}`);
+    ws.onopen = () => {
+      wsOk = true; reconnectDelay = 500;
+      $('connDot').classList.add('on');
+      ws.send(JSON.stringify({ type: 'hello', playerId: myId }));
+    };
+    ws.onclose = () => {
+      wsOk = false;
+      $('connDot').classList.remove('on');
+      setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 5000);
+    };
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'welcome') {
+        game = msg.state;
+        if (msg.playerId && game.players[msg.playerId]) {
+          myId = msg.playerId;
+          showScreen(masterMode ? 'masterScreen' : 'gameScreen');
+        }
+        render();
+      } else if (msg.type === 'joined') {
+        myId = msg.playerId;
+        store.setItem('playerId', myId);
+        showScreen('gameScreen');
+      } else if (msg.type === 'state') {
+        game = msg.state;
+        if (myId && !game.players[myId]) {
+          myId = null; store.removeItem('playerId');
+          showScreen('joinScreen');
+        }
+        render();
+      } else if (msg.type === 'masterOk') {
+        store.setItem('masterPin', masterPin);
+        masterMode = true;
+        showScreen('masterScreen');
+        render();
+      } else if (msg.type === 'masterFail') {
+        masterPin = null; store.removeItem('masterPin');
+        toast('Wrong PIN');
+      } else if (msg.type === 'error') {
+        toast(msg.error);
+      }
+    };
+  }
+  const sendMsg = (obj) => { if (wsOk) ws.send(JSON.stringify(obj)); };
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
+    $(id).classList.add('active');
+  }
+  let toastTimer;
+  function toast(text) {
+    const t = $('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+  const activeId = () => game.turnOrder[game.activeIdx];
+
+  const nameInput = $('nameInput'), cmdInput = $('cmdInput'), joinBtn = $('joinBtn');
+  nameInput.value = store.getItem('playerName') || '';
+
+  function validateJoin() {
+    joinBtn.disabled = !(nameInput.value.trim() && chosenCommander);
+  }
+  nameInput.addEventListener('input', validateJoin);
+
+  let searchTimer;
+  cmdInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = cmdInput.value.trim();
+    if (q.length < 3) { $('results').innerHTML = ''; return; }
+    searchTimer = setTimeout(async () => {
+      try {
+        const r = await fetch(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(q)}`);
+        const data = await r.json();
+        $('results').innerHTML = '';
+        (data.data || []).slice(0, 6).forEach((name) => {
+          const div = document.createElement('div');
+          div.textContent = name;
+          div.onclick = () => pickCommander(name);
+          $('results').appendChild(div);
+        });
+      } catch {}
+    }, 350);
+  });
+
+  async function pickCommander(name) {
+    $('results').innerHTML = '';
+    cmdInput.value = name;
+    try {
+      const r = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`);
+      const card = await r.json();
+      const uris = card.image_uris || (card.card_faces && card.card_faces[0].image_uris) || {};
+      chosenCommander = { name: card.name, art: uris.art_crop || '', image: uris.normal || '' };
+      $('cmdImg').src = chosenCommander.image;
+      $('cmdName').textContent = chosenCommander.name;
+      $('cmdPreview').style.display = 'block';
+    } catch { toast('Could not load card'); }
+    validateJoin();
+  }
+
+  joinBtn.onclick = () => {
+    store.setItem('playerName', nameInput.value.trim());
+    sendMsg({ type: 'join', playerId: myId, name: nameInput.value.trim(), commander: chosenCommander });
+  };
+
+  let pendingDelta = 0, deltaTimer;
+  function applyLife(delta) {
+    if (!myId) return;
+    const p = game.players[myId];
+    if (p) { p.life += delta; render(); }
+    sendMsg({ type: 'life', playerId: myId, delta });
+    pendingDelta += delta;
+    const f = $('deltaFloat');
+    f.textContent = (pendingDelta > 0 ? '+' : '') + pendingDelta;
+    f.classList.add('show');
+    clearTimeout(deltaTimer);
+    deltaTimer = setTimeout(() => { f.classList.remove('show'); pendingDelta = 0; }, 1200);
+    const l = $('myLife');
+    l.classList.remove('bump'); void l.offsetWidth; l.classList.add('bump');
+  }
+  function bindZone(el, delta) {
+    let holdT = null, repT = null;
+    const stop = () => { clearTimeout(holdT); clearInterval(repT); holdT = repT = null; };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      applyLife(delta);
+      holdT = setTimeout(() => { repT = setInterval(() => applyLife(delta), 140); }, 450);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, stop));
+  }
+  bindZone($('tapPlus'), 1);
+  bindZone($('tapMinus'), -1);
+
+  $('endTurnBtn').onclick = () => sendMsg({ type: 'endTurn', playerId: myId });
+  $('cmdBtn').onclick = () => $('cmdSheet').classList.add('open');
+  $('cmdClose').onclick = () => $('cmdSheet').classList.remove('open');
+
+  function promptMaster() {
+    if (masterPin) { sendMsg({ type: 'master', pin: masterPin, action: 'auth' }); return; }
+    const pin = prompt('Master PIN:');
+    if (!pin) return;
+    masterPin = pin;
+    sendMsg({ type: 'master', pin, action: 'auth' });
+  }
+  $('gearJoin').onclick = () => {
+    toast(`TV screen: ${location.origin}/tv`);
+    setTimeout(promptMaster, 300);
+  };
+  $('gearGame').onclick = promptMaster;
+  $('masterBack').onclick = () => {
+    masterMode = false;
+    showScreen(myId && game.players[myId] ? 'gameScreen' : 'joinScreen');
+  };
+  const mAct = (action, extra = {}) => sendMsg({ type: 'master', pin: masterPin, action, ...extra });
+  $('mEndTurn').onclick = () => mAct('endTurn');
+  $('mResetLife').onclick = () => { if (confirm('Reset everyone to 40 life?')) mAct('resetLife'); };
+  $('mNewGame').onclick = () => { if (confirm('Wipe ALL players and start a new game?')) mAct('newGame'); };
+
+  function render() {
+    const me = myId ? game.players[myId] : null;
+
+    if (me) {
+      $('myName').textContent = me.name;
+      $('myLife').textContent = me.life;
+      $('lifeArt').style.backgroundImage = me.commander && me.commander.art ? `url(${me.commander.art})` : 'none';
+
+      const act = game.players[activeId()];
+      const myTurn = activeId() === myId;
+      const banner = $('turnBanner');
+      banner.classList.toggle('you', myTurn);
+      banner.textContent = !act ? 'Waiting for players…'
+        : myTurn ? `👑 YOUR TURN · ${game.turnNumber}`
+        : `${act.name}'s turn · ${game.turnNumber}`;
+      $('endTurnBtn').disabled = !myTurn;
+
+      const list = $('cmdDmgList');
+      list.innerHTML = '';
+      game.turnOrder.filter((id) => id !== myId).forEach((oppId) => {
+        const opp = game.players[oppId];
+        if (!opp) return;
+        const dmg = (me.cmdDamage && me.cmdDamage[oppId]) || 0;
+        const row = document.createElement('div');
+        row.className = 'cmdRow';
+        row.innerHTML = `
+          <img src="${opp.commander && opp.commander.art ? opp.commander.art : ''}" onerror="this.style.visibility='hidden'">
+          <div class="info"><div class="n">${esc(opp.commander ? opp.commander.name : '?')}</div><div class="c">${esc(opp.name)}</div></div>
+          <button class="m">−</button>
+          <div class="dmg ${dmg >= 21 ? 'lethal' : ''}">${dmg}</div>
+          <button class="p">+</button>`;
+        row.querySelector('.m').onclick = () => sendMsg({ type: 'cmdDamage', playerId: myId, fromId: oppId, delta: -1 });
+        row.querySelector('.p').onclick = () => sendMsg({ type: 'cmdDamage', playerId: myId, fromId: oppId, delta: 1 });
+        list.appendChild(row);
+      });
+    }
+
+    if (masterMode) {
+      const list = $('masterList');
+      list.innerHTML = '';
+      game.turnOrder.forEach((id) => {
+        const p = game.players[id];
+        if (!p) return;
+        const isActive = id === activeId();
+        const row = document.createElement('div');
+        row.className = 'mRow';
+        row.innerHTML = `
+          <div class="artbg" style="background-image:url('${p.commander && p.commander.art ? p.commander.art : ''}')"></div>
+          <div class="top">
+            <img src="${p.commander && p.commander.art ? p.commander.art : ''}" onerror="this.style.visibility='hidden'">
+            <div class="nm">${isActive ? '👑 ' : ''}${esc(p.name)}${p.connected ? '' : ' <span style="color:var(--muted);font-size:12px">(offline)</span>'}</div>
+            <div class="lf">${p.life}</div>
+          </div>
+          <div class="ctrls">
+            <button data-d="-5">−5</button>
+            <button data-d="-1">−1</button>
+            <button data-d="1">+1</button>
+            <button data-d="5">+5</button>
+            <button class="act">Turn</button>
+            <button class="rm">✕</button>
+          </div>`;
+        row.querySelectorAll('[data-d]').forEach((b) => {
+          b.onclick = () => mAct('life', { targetId: id, delta: Number(b.dataset.d) });
+        });
+        row.querySelector('.act').onclick = () => mAct('setActive', { targetId: id });
+        row.querySelector('.rm').onclick = () => { if (confirm(`Remove ${p.name}?`)) mAct('removePlayer', { targetId: id }); };
+        list.appendChild(row);
+      });
+    }
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  connect();
+})();
+</script>
+</body>
+</html>
