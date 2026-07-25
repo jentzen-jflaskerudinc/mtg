@@ -102,9 +102,42 @@
   }
   #turnPill b { color: #fff; font-weight: 700; }
   #turnPill .crown { color: var(--gold); }
-  #turnPill .timer { color: #fff; font-variant-numeric: tabular-nums; }
-  #turnPill .timer.low { color: var(--danger); font-weight: 700; animation: blink 1s infinite; }
-  @keyframes blink { 50% { opacity: .35; } }
+
+  /* big obnoxious center countdown */
+  #bigTimer {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 8; display: none; text-align: center;
+    background: rgba(0,0,0,.86); border: 4px solid rgba(255,255,255,.25);
+    border-radius: 30px; padding: 1.5vh 5vw;
+    font-size: 18vh; font-weight: 300; line-height: 1.15; color: #fff;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 60px rgba(0,0,0,.8);
+  }
+  #bigTimer .lbl { display: block; font-size: 2.4vh; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; }
+  #bigTimer.low { color: var(--danger); border-color: var(--danger); animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+
+  /* big anonymous vote prompt */
+  #bigVote {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 8; display: none; text-align: center;
+    background: rgba(0,0,0,.88); border: 4px solid var(--gold);
+    border-radius: 30px; padding: 3vh 5vw;
+    box-shadow: 0 0 60px rgba(255,215,106,.25);
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse { 50% { box-shadow: 0 0 100px rgba(255,215,106,.45); } }
+  #bigVote .lbl { font-size: 3vh; color: var(--gold); letter-spacing: 3px; text-transform: uppercase; }
+  #bigVote .time { font-size: 13vh; font-weight: 300; line-height: 1.15; color: #fff; font-variant-numeric: tabular-nums; }
+  #bigVote .cnt { font-size: 3.4vh; color: #fff; font-weight: 700; }
+  #bigVote .hint { font-size: 2vh; color: var(--muted); margin-top: .6vh; }
+
+  /* sound status pill */
+  #soundHint {
+    position: absolute; bottom: 2vh; right: 1.5vw; z-index: 9;
+    background: rgba(0,0,0,.85); border-radius: 12px; padding: 1vh 1.5vw;
+    font-size: 2vh; color: var(--gold); display: none;
+  }
 
   #joinBox {
     position: absolute; inset: 0; z-index: 10; background: var(--bg);
@@ -124,6 +157,9 @@
   <div id="connDot"></div>
   <div id="grid"></div>
   <div id="turnPill"></div>
+  <div id="bigTimer"></div>
+  <div id="bigVote"></div>
+  <div id="soundHint"></div>
   <div id="joinBox">
     <h1>⚔️ COMMANDER</h1>
     <div class="url" id="joinUrl"></div>
@@ -136,13 +172,86 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   let ws, reconnectDelay = 500;
-  let game = { players: {}, turnOrder: [], activeIdx: 0, turnNumber: 1, timer: { votes: [], running: false, endsAt: 0, duration: 120 } };
+  let game = { players: {}, turnOrder: [], activeIdx: 0, turnNumber: 1, timer: { votes: [], pendingSeconds: 0, running: false, endsAt: 0, duration: 300 } };
   let prevLife = {};
   let clockOffset = 0;
+  let lastExpiredAt = 0;
 
   const joinUrl = location.origin.replace(/^https?:\/\//, '');
   $('joinUrl').textContent = joinUrl;
   new QRCode($('qr'), { text: location.origin, width: 180, height: 180 });
+
+  // ---------- sound effects ----------
+  let soundUnlocked = false;
+  let soundOn = localStorage.getItem('tvSound') !== '0';
+  let soundLib = {};
+  fetch('/sounds-list').then((r) => r.json()).then((d) => { soundLib = d || {}; updateSoundHint(); }).catch(() => {});
+
+  function hasSounds() { return Object.keys(soundLib).some((k) => soundLib[k] && soundLib[k].length); }
+  function play(cat) {
+    if (!soundUnlocked || !soundOn) return;
+    const list = soundLib[cat];
+    if (!list || !list.length) return;
+    try {
+      const a = new Audio(list[Math.floor(Math.random() * list.length)]);
+      a.play().catch(() => {});
+    } catch {}
+  }
+  let hintTimer;
+  function updateSoundHint(temporary) {
+    const h = $('soundHint');
+    clearTimeout(hintTimer);
+    if (!hasSounds()) { h.style.display = 'none'; return; }
+    if (!soundUnlocked) {
+      h.textContent = '🔊 Press OK on the remote for sound';
+      h.style.display = 'block';
+      return;
+    }
+    h.textContent = soundOn ? '🔊 Sound on' : '🔇 Sound off (OK toggles)';
+    h.style.display = 'block';
+    hintTimer = setTimeout(() => { h.style.display = 'none'; }, 3000);
+  }
+  function onOk() {
+    if (!soundUnlocked) {
+      soundUnlocked = true;
+      soundOn = true;
+      localStorage.setItem('tvSound', '1');
+      // warm up the audio pipeline inside the user gesture
+      try { const a = new Audio(); a.muted = true; a.play().catch(() => {}); } catch {}
+      play('turn');
+    } else {
+      soundOn = !soundOn;
+      localStorage.setItem('tvSound', soundOn ? '1' : '0');
+    }
+    updateSoundHint(true);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.keyCode === 13 || e.keyCode === 23) onOk();
+  });
+  document.addEventListener('click', onOk);
+
+  // sound event detection
+  let prevTurnKey = null, prevTimerRunning = false, prevLifeSnd = {}, dmgTimers = {};
+  function detectSoundEvents() {
+    const key = `${game.turnNumber}:${game.activeIdx}`;
+    if (prevTurnKey !== null && key !== prevTurnKey && game.turnOrder.length > 0) play('turn');
+    prevTurnKey = key;
+
+    const running = !!(game.timer && game.timer.running);
+    if (running && !prevTimerRunning) play('timer');
+    prevTimerRunning = running;
+
+    for (const id of game.turnOrder) {
+      const p = game.players[id];
+      if (!p) continue;
+      const prev = prevLifeSnd[id];
+      if (prev !== undefined && p.life < prev) {
+        clearTimeout(dmgTimers[id]);
+        dmgTimers[id] = setTimeout(() => play('damage'), 600);
+      }
+      prevLifeSnd[id] = p.life;
+    }
+  }
 
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -159,9 +268,17 @@
     };
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data);
-      if (msg.type === 'welcome' || msg.type === 'state') {
+      if (msg.type === 'welcome') {
         game = msg.state;
         if (game.now) clockOffset = game.now - Date.now();
+        prevTurnKey = `${game.turnNumber}:${game.activeIdx}`;
+        prevTimerRunning = !!(game.timer && game.timer.running);
+        for (const id of game.turnOrder) if (game.players[id]) prevLifeSnd[id] = game.players[id].life;
+        render();
+      } else if (msg.type === 'state') {
+        game = msg.state;
+        if (game.now) clockOffset = game.now - Date.now();
+        detectSoundEvents();
         render();
       }
     };
@@ -181,24 +298,42 @@
     return `${m}:${String(r).padStart(2, '0')}`;
   }
 
-  function timerHtml() {
-    const t = game.timer;
-    if (!t) return '';
-    if (t.running) {
+  function renderCenter() {
+    const t = game.timer || {};
+    const bigT = $('bigTimer');
+    const bigV = $('bigVote');
+    const n = game.turnOrder.length;
+
+    // anonymous vote prompt
+    if (!t.running && t.votes && t.votes.length > 0 && n > 0) {
+      const majority = Math.floor(n / 2) + 1;
+      bigV.style.display = 'block';
+      bigV.innerHTML = `
+        <div class="lbl">Turn timer proposed</div>
+        <div class="time">⏱ ${fmt(t.pendingSeconds)}</div>
+        <div class="cnt">${t.votes.length} / ${majority} votes to start</div>
+        <div class="hint">vote on your phone — ⏱ button</div>`;
+    } else {
+      bigV.style.display = 'none';
+    }
+
+    // running countdown
+    if (t.running && n > 0) {
       const rem = Math.round((t.endsAt - (Date.now() + clockOffset)) / 1000);
-      const low = rem <= 10;
-      return `<span class="timer${low ? ' low' : ''}">⏱ ${rem <= 0 ? 'TIME!' : fmt(rem)}</span>`;
+      const act = game.players[game.turnOrder[game.activeIdx]];
+      bigT.style.display = 'block';
+      bigT.innerHTML = `<span class="lbl">${esc(act ? act.name : '')}'s turn</span>${rem <= 0 ? 'TIME!' : fmt(rem)}`;
+      bigT.classList.toggle('low', rem <= 30);
+      if (rem <= 0 && t.endsAt !== lastExpiredAt) {
+        lastExpiredAt = t.endsAt;
+        play('timerend');
+      }
+    } else {
+      bigT.style.display = 'none';
     }
-    if (t.votes.length > 0) {
-      const majority = Math.floor(game.turnOrder.length / 2) + 1;
-      return `<span class="timer">⏱ vote ${t.votes.length}/${majority}</span>`;
-    }
-    return '';
   }
 
-  setInterval(() => {
-    if (game.turnOrder.length > 0 && game.timer && game.timer.running) renderPill();
-  }, 500);
+  setInterval(renderCenter, 500);
 
   function renderPill() {
     const ids = game.turnOrder;
@@ -209,8 +344,7 @@
     $('turnPill').innerHTML =
       `<span>Turn ${game.turnNumber}</span>` +
       `<span><span class="crown">👑</span> <b>${esc(act ? act.name : '')}</b></span>` +
-      `<span>next: ${esc(next ? next.name : '')}</span>` +
-      timerHtml();
+      `<span>next: ${esc(next ? next.name : '')}</span>`;
   }
 
   function render() {
@@ -255,7 +389,38 @@
     });
 
     renderPill();
+    renderCenter();
   }
+
+  // ---------- keep the Firestick awake ----------
+  let wakeLock = null;
+  async function keepAwake() {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => setTimeout(keepAwake, 1000));
+    } catch {}
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') keepAwake();
+  });
+  keepAwake();
+
+  // Fallback: an invisible always-playing video also blocks the screensaver
+  try {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 2;
+    const ctx = cv.getContext('2d');
+    let tick = 0;
+    setInterval(() => { ctx.fillStyle = tick++ % 2 ? '#000' : '#010101'; ctx.fillRect(0, 0, 2, 2); }, 1000);
+    const v = document.createElement('video');
+    v.srcObject = cv.captureStream(1);
+    v.muted = true;
+    v.setAttribute('playsinline', '');
+    v.style.cssText = 'position:absolute;width:2px;height:2px;opacity:0.01;pointer-events:none;';
+    document.body.appendChild(v);
+    const tryPlay = () => v.play().catch(() => setTimeout(tryPlay, 3000));
+    tryPlay();
+  } catch {}
 
   connect();
 })();
