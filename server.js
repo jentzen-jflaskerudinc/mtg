@@ -51,7 +51,7 @@ function newGameState() {
     turnOrder: [],    // array of player ids
     activeIdx: 0,
     turnNumber: 1,
-    timer: { votes: [], pendingSeconds: 0, running: false, endsAt: 0, duration: DEFAULT_TIMER_SECONDS },
+    timer: { votes: [], pendingSeconds: 0, running: false, mode: null, endsAt: 0, duration: DEFAULT_TIMER_SECONDS },
     startedAt: Date.now(),
   };
 }
@@ -108,13 +108,16 @@ function advanceTurn() {
   state.activeIdx = (state.activeIdx + 1) % state.turnOrder.length;
   if (state.activeIdx === 0) state.turnNumber += 1;
   if (state.timer.running) {
-    state.timer.endsAt = Date.now() + state.timer.duration * 1000;
+    // one-shot vote timers die with the turn they were called on
+    if (state.timer.mode === 'turn') stopTimer();
+    else state.timer.endsAt = Date.now() + state.timer.duration * 1000;
   }
 }
 
-function startTimer(seconds) {
+function startTimer(seconds, mode) {
   state.timer.duration = clampInt(seconds || state.timer.duration, 10, 3600);
   state.timer.running = true;
+  state.timer.mode = mode || 'global';
   state.timer.votes = [];
   state.timer.pendingSeconds = 0;
   state.timer.endsAt = Date.now() + state.timer.duration * 1000;
@@ -122,6 +125,7 @@ function startTimer(seconds) {
 
 function stopTimer() {
   state.timer.running = false;
+  state.timer.mode = null;
   state.timer.votes = [];
   state.timer.pendingSeconds = 0;
   state.timer.endsAt = 0;
@@ -145,7 +149,7 @@ function toggleTimerVote(playerId, minutes) {
     if (t.votes.length === 0) t.pendingSeconds = 0; // proposal withdrawn
   }
   const majority = Math.floor(state.turnOrder.length / 2) + 1;
-  if (t.votes.length >= majority) startTimer(t.pendingSeconds);
+  if (t.votes.length >= majority) startTimer(t.pendingSeconds, 'turn');
   return true;
 }
 
@@ -211,7 +215,7 @@ function handleMaster(ws, msg) {
       removePlayer(msg.targetId);
       break;
     case 'timerStart':
-      startTimer(msg.seconds);
+      startTimer(msg.seconds, 'global');
       break;
     case 'timerStop':
       stopTimer();

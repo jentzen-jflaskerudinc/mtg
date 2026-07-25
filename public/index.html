@@ -274,7 +274,7 @@
     <button style="background:#4a1f1f" id="mNewGame">New Game</button>
   </div>
   <div class="mGlobal">
-    <button style="background:#155e4c" id="mTimerStart">Start Timer…</button>
+    <button style="background:#155e4c" id="mTimerStart">Global Timer…</button>
     <button style="background:#3d3d46" id="mTimerStop">Timer Off</button>
   </div>
   <button class="btn secondary" id="masterBack">← Back</button>
@@ -314,7 +314,7 @@
     } catch {}
   }
   // event detection between state broadcasts
-  let prevTurnKey = null, prevTimerRunning = false, prevLifeAll = {}, dmgTimers = {};
+  let prevTurnKey = null, prevTimerRunning = false, prevLifeAll = {}, dmgPending = null, lastDmgSound = 0;
   function detectSoundEvents() {
     const key = `${game.turnNumber}:${game.activeIdx}`;
     if (prevTurnKey !== null && key !== prevTurnKey && game.turnOrder.length > 0) play('turn');
@@ -324,16 +324,21 @@
     if (running && !prevTimerRunning) play('timer');
     prevTimerRunning = running;
 
+    let anyLoss = false;
     for (const id of game.turnOrder) {
       const p = game.players[id];
       if (!p) continue;
       const prev = prevLifeAll[id];
-      if (prev !== undefined && p.life < prev) {
-        // debounce bursts of taps into one sound
-        clearTimeout(dmgTimers[id]);
-        dmgTimers[id] = setTimeout(() => play('damage'), 600);
-      }
+      if (prev !== undefined && p.life < prev) anyLoss = true;
       prevLifeAll[id] = p.life;
+    }
+    if (anyLoss) {
+      // one sound per burst, no matter how many players took damage
+      clearTimeout(dmgPending);
+      dmgPending = setTimeout(() => {
+        const now = Date.now();
+        if (now - lastDmgSound > 800) { lastDmgSound = now; play('damage'); }
+      }, 600);
     }
   }
 
@@ -517,21 +522,21 @@
     const majority = Math.floor(game.turnOrder.length / 2) + 1;
     if (t.running) {
       body.innerHTML = `<div class="voteBox">
-        <div class="cnt">Timer is running</div>
+        <div class="cnt">${t.mode === 'turn' ? 'One-turn timer running' : 'Global timer running'}</div>
         <div class="big">⏱ ${fmt(t.duration)}</div>
-        <div class="cnt">per turn — resets each End Turn</div>
+        <div class="cnt">${t.mode === 'turn' ? 'ends when this turn ends' : 'every turn — resets on End Turn'}</div>
       </div>`;
     } else if (t.votes.length > 0) {
       const voted = t.votes.includes(myId);
       body.innerHTML = `<div class="voteBox">
-        <div class="cnt">Turn timer proposed</div>
+        <div class="cnt">Timer for THIS turn proposed</div>
         <div class="big">⏱ ${fmt(t.pendingSeconds)}</div>
         <div class="cnt">votes: ${t.votes.length}/${majority} to start</div>
         <button class="btn" id="voteBtn" style="background:${voted ? '#3d3d46' : 'var(--gold)'};color:${voted ? '#fff' : '#14120a'}">${voted ? 'Retract my vote' : 'Vote YES'}</button>
       </div>`;
       $('voteBtn').onclick = () => sendMsg({ type: 'timerVote', playerId: myId });
     } else {
-      body.innerHTML = `<div class="cnt" style="color:var(--muted);font-size:13px;margin-bottom:10px;text-align:center">Propose a per-turn time limit — starts when a majority votes yes</div>
+      body.innerHTML = `<div class="cnt" style="color:var(--muted);font-size:13px;margin-bottom:10px;text-align:center">Put the current turn on a clock — starts on majority vote, ends with the turn</div>
         <div class="minGrid" id="minGrid"></div>`;
       const grid = $('minGrid');
       for (let m = 1; m <= 10; m++) {
@@ -586,7 +591,7 @@
   $('mResetLife').onclick = () => { if (confirm('Reset everyone to 40 life?')) mAct('resetLife'); };
   $('mNewGame').onclick = () => { if (confirm('Wipe ALL players and start a new game?')) mAct('newGame'); };
   $('mTimerStart').onclick = () => {
-    const m = parseInt(prompt('Timer minutes (1-10):', '5'), 10);
+    const m = parseInt(prompt('Global timer — minutes per turn (1-10):', '5'), 10);
     if (m >= 1 && m <= 10) mAct('timerStart', { seconds: m * 60 });
   };
   $('mTimerStop').onclick = () => mAct('timerStop');

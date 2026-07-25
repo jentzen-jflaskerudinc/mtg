@@ -231,7 +231,7 @@
   document.addEventListener('click', onOk);
 
   // sound event detection
-  let prevTurnKey = null, prevTimerRunning = false, prevLifeSnd = {}, dmgTimers = {};
+  let prevTurnKey = null, prevTimerRunning = false, prevLifeSnd = {}, dmgPending = null, lastDmgSound = 0;
   function detectSoundEvents() {
     const key = `${game.turnNumber}:${game.activeIdx}`;
     if (prevTurnKey !== null && key !== prevTurnKey && game.turnOrder.length > 0) play('turn');
@@ -241,15 +241,20 @@
     if (running && !prevTimerRunning) play('timer');
     prevTimerRunning = running;
 
+    let anyLoss = false;
     for (const id of game.turnOrder) {
       const p = game.players[id];
       if (!p) continue;
       const prev = prevLifeSnd[id];
-      if (prev !== undefined && p.life < prev) {
-        clearTimeout(dmgTimers[id]);
-        dmgTimers[id] = setTimeout(() => play('damage'), 600);
-      }
+      if (prev !== undefined && p.life < prev) anyLoss = true;
       prevLifeSnd[id] = p.life;
+    }
+    if (anyLoss) {
+      clearTimeout(dmgPending);
+      dmgPending = setTimeout(() => {
+        const now = Date.now();
+        if (now - lastDmgSound > 800) { lastDmgSound = now; play('damage'); }
+      }, 600);
     }
   }
 
@@ -309,7 +314,7 @@
       const majority = Math.floor(n / 2) + 1;
       bigV.style.display = 'block';
       bigV.innerHTML = `
-        <div class="lbl">Turn timer proposed</div>
+        <div class="lbl">Timer for this turn?</div>
         <div class="time">⏱ ${fmt(t.pendingSeconds)}</div>
         <div class="cnt">${t.votes.length} / ${majority} votes to start</div>
         <div class="hint">vote on your phone — ⏱ button</div>`;
