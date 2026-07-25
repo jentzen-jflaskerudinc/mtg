@@ -48,9 +48,9 @@
   }
   .btn:disabled { opacity: .4; }
   .btn.secondary { background: var(--panel2); color: var(--text); font-weight: 600; }
-  #results { margin-top: 6px; border-radius: 12px; overflow: hidden; }
-  #results div { padding: 12px 14px; background: var(--panel2); border-bottom: 1px solid #12151d; font-size: 16px; cursor: pointer; }
-  #results div:active { background: #2a3140; }
+  #results, #searchResults { margin-top: 6px; border-radius: 12px; overflow: hidden; }
+  #results div, #searchResults div { padding: 12px 14px; background: var(--panel2); border-bottom: 1px solid #12151d; font-size: 16px; cursor: pointer; }
+  #results div:active, #searchResults div:active { background: #2a3140; }
   #cmdPreview { display: none; margin-top: 14px; text-align: center; }
   #cmdPreview img { width: 65%; border-radius: 12px; }
   #cmdPreview p { margin-top: 6px; color: var(--gold); font-size: 15px; }
@@ -121,7 +121,7 @@
   }
   #endTurnBtn { flex: 1; background: var(--blue); }
   #endTurnBtn:disabled { background: rgba(255,255,255,.1); color: var(--muted); }
-  #cmdBtn, #gearGame, #timerBtn, #playersBtn { width: 50px; font-size: 19px; font-weight: 400; }
+  #cmdBtn, #gearGame, #timerBtn, #playersBtn, #searchBtn { width: 44px; font-size: 18px; font-weight: 400; }
   #timerBtn.voted { background: #7a5c17; }
 
   .sheet {
@@ -233,6 +233,7 @@
   <div class="bar">
     <button id="endTurnBtn" disabled>End Turn</button>
     <button id="timerBtn" title="Turn timer">⏱</button>
+    <button id="searchBtn" title="Card lookup">🔍</button>
     <button id="playersBtn" title="Commanders">👥</button>
     <button id="cmdBtn" title="Commander damage">⚔</button>
     <button id="gearGame" title="Settings">⚙</button>
@@ -251,6 +252,12 @@
     <h2>Turn timer</h2>
     <div id="timerSheetBody"></div>
     <button class="btn secondary" id="timerClose" style="margin-top:10px">Close</button>
+  </div>
+  <div class="sheet" id="searchSheet">
+    <h2>Card lookup</h2>
+    <input type="text" id="searchInput" placeholder="Start typing any card name…" autocomplete="off">
+    <div id="searchResults"></div>
+    <button class="btn secondary" id="searchClose" style="margin-top:14px">Close</button>
   </div>
   <div class="sheet" id="setSheet">
     <h2>Settings</h2>
@@ -301,7 +308,7 @@
   let lastExpiredAt = 0;
 
   // ---------- sound effects ----------
-  let soundOn = store.getItem('soundOn') !== '0';
+  let soundOn = store.getItem('soundOn') === '1';
   let soundLib = {};
   fetch('/sounds-list').then((r) => r.json()).then((d) => { soundLib = d || {}; }).catch(() => {});
   function play(cat) {
@@ -496,6 +503,43 @@
   $('playersBtn').onclick = () => $('cmdrSheet').classList.add('open');
   $('cmdrClose').onclick = () => $('cmdrSheet').classList.remove('open');
   $('cardZoom').onclick = () => $('cardZoom').classList.remove('open');
+
+  // ---------- card lookup ----------
+  $('searchBtn').onclick = () => {
+    $('searchSheet').classList.add('open');
+    setTimeout(() => $('searchInput').focus(), 250);
+  };
+  $('searchClose').onclick = () => $('searchSheet').classList.remove('open');
+  let lookupTimer;
+  $('searchInput').addEventListener('input', () => {
+    clearTimeout(lookupTimer);
+    const q = $('searchInput').value.trim();
+    if (q.length < 3) { $('searchResults').innerHTML = ''; return; }
+    lookupTimer = setTimeout(async () => {
+      try {
+        const r = await fetch(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(q)}`);
+        const data = await r.json();
+        $('searchResults').innerHTML = '';
+        (data.data || []).slice(0, 8).forEach((name) => {
+          const div = document.createElement('div');
+          div.textContent = name;
+          div.onclick = async () => {
+            try {
+              const cr = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`);
+              const card = await cr.json();
+              const uris = card.image_uris || (card.card_faces && card.card_faces[0].image_uris) || {};
+              if (uris.normal) {
+                $('zoomImg').src = uris.normal;
+                $('zoomWho').textContent = card.type_line || '';
+                $('cardZoom').classList.add('open');
+              }
+            } catch {}
+          };
+          $('searchResults').appendChild(div);
+        });
+      } catch {}
+    }, 350);
+  });
 
   function zoomCard(p) {
     if (!p || !p.commander || !p.commander.image) return;
