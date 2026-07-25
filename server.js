@@ -9,6 +9,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 
@@ -22,6 +23,22 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/tv', (_, res) => res.sendFile(path.join(__dirname, 'public', 'tv.html')));
 app.get('/healthz', (_, res) => res.send('ok'));
 
+// Lists sound files in public/sounds grouped by category prefix.
+// Naming: damage-1.mp3, damage-2.mp3, turn-1.mp3, timer-1.mp3, timerend-1.mp3 ...
+app.get('/sounds-list', (_, res) => {
+  const dir = path.join(__dirname, 'public', 'sounds');
+  const out = {};
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      const m = f.match(/^([a-z]+)[-_]?\d*\.(mp3|ogg|wav|m4a)$/i);
+      if (!m) continue;
+      const cat = m[1].toLowerCase();
+      (out[cat] = out[cat] || []).push('/sounds/' + f);
+    }
+  } catch {}
+  res.json(out);
+});
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
@@ -34,7 +51,7 @@ function newGameState() {
     turnOrder: [],    // array of player ids
     activeIdx: 0,
     turnNumber: 1,
-    timer: { votes: [], running: false, endsAt: 0, duration: DEFAULT_TIMER_SECONDS },
+    timer: { votes: [], pendingSeconds: 0, running: false, endsAt: 0, duration: DEFAULT_TIMER_SECONDS },
     startedAt: Date.now(),
   };
 }
@@ -99,23 +116,36 @@ function startTimer(seconds) {
   state.timer.duration = clampInt(seconds || state.timer.duration, 10, 3600);
   state.timer.running = true;
   state.timer.votes = [];
+  state.timer.pendingSeconds = 0;
   state.timer.endsAt = Date.now() + state.timer.duration * 1000;
 }
 
 function stopTimer() {
   state.timer.running = false;
   state.timer.votes = [];
+  state.timer.pendingSeconds = 0;
   state.timer.endsAt = 0;
 }
 
-function toggleTimerVote(playerId) {
+// A vote either opens a proposal (with a duration in minutes) or toggles
+// the caller's vote on the open proposal. Majority starts the timer.
+function toggleTimerVote(playerId, minutes) {
   if (!state.players[playerId] || state.timer.running) return false;
-  const i = state.timer.votes.indexOf(playerId);
-  if (i === -1) state.timer.votes.push(playerId);
-  else state.timer.votes.splice(i, 1);
-  // strict majority of current players starts the timer
+  const t = state.timer;
+  if (t.votes.length === 0) {
+    // no open proposal: this vote creates one (1-10 minutes)
+    const mins = clampInt(minutes, 1, 10);
+    if (!minutes) return false;
+    t.pendingSeconds = mins * 60;
+    t.votes = [playerId];
+  } else {
+    const i = t.votes.indexOf(playerId);
+    if (i === -1) t.votes.push(playerId);
+    else t.votes.splice(i, 1);
+    if (t.votes.length === 0) t.pendingSeconds = 0; // proposal withdrawn
+  }
   const majority = Math.floor(state.turnOrder.length / 2) + 1;
-  if (state.timer.votes.length >= majority) startTimer();
+  if (t.votes.length >= majority) startTimer(t.pendingSeconds);
   return true;
 }
 
@@ -132,6 +162,7 @@ function removePlayer(targetId) {
   }
   for (const p of Object.values(state.players)) delete p.cmdDamage[targetId];
   state.timer.votes = state.timer.votes.filter((id) => id !== targetId);
+  if (state.timer.votes.length === 0) state.timer.pendingSeconds = 0;
   return true;
 }
 
@@ -293,7 +324,7 @@ wss.on('connection', (ws) => {
       }
 
       case 'timerVote': {
-        if (ws.playerId && ws.playerId === msg.playerId && toggleTimerVote(msg.playerId)) {
+        if (ws.playerId && ws.playerId === msg.playerId && toggleTimerVote(msg.playerId, msg.minutes)) {
           broadcast();
         }
         break;
