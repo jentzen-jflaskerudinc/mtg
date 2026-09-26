@@ -17,8 +17,8 @@ body { background: #08080A; font-family: 'Cinzel', Georgia, serif; -webkit-tap-h
 a { color: #D8B45C; } a:hover { color: #EFD08A; }
 button { font-family: inherit; }
 #stage { position: absolute; width: 1586px; height: 992px; transform-origin: top left; }
-#strip { position: absolute; top: 0; left: 0; width: 4758px; height: 992px; display: flex; transition: transform 0.32s ease; }
-.screenpage { position: relative; width: 1586px; height: 992px; flex: none; box-sizing: border-box; background: #08080A; color: #EFEAE0; overflow: hidden; }
+#strip { position: absolute; top: 0; left: 0; width: 1586px; height: 992px; overflow: hidden; }
+.screenpage { position: absolute; top: 0; left: 0; will-change: transform; width: 1586px; height: 992px; flex: none; box-sizing: border-box; background: #08080A; color: #EFEAE0; overflow: hidden; }
 .overlaySheet { position: absolute; top: 0; left: 0; width: 1586px; height: 992px; z-index: 30; display: none; align-items: center; justify-content: center; background: rgba(8,8,10,0.9); }
 .overlaySheet.open { display: flex; }
 .menuCard { width: 460px; background: #0A0A0C; border: 1px solid #6A552A; border-radius: 14px; padding: 34px 30px; display: flex; flex-direction: column; gap: 14px; }
@@ -42,6 +42,24 @@ button { font-family: inherit; }
 #connDot.on { opacity: 0; }
 #toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 95; background: rgba(10,10,12,0.94); border: 1px solid #6A552A; color: #E7DFCE; padding: 12px 22px; border-radius: 10px; font-size: 14px; letter-spacing: 0.08em; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 #toast.show { opacity: 1; }
+#endTurn { transition: transform 0.08s ease, filter 0.08s ease; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+#endTurn img { transition: filter 0.08s ease; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.75)); }
+#endTurn.pressed { transform: translateY(3px) scale(0.955); }
+#endTurn.pressed img { filter: brightness(0.82) drop-shadow(0 1px 2px rgba(0,0,0,0.9)); }
+#endTurn.flash img { animation: etFlash 0.45s ease-out; }
+@keyframes etFlash { 0% { filter: brightness(1.45) drop-shadow(0 0 18px rgba(232,201,106,0.9)); } 100% { filter: brightness(1) drop-shadow(0 4px 6px rgba(0,0,0,0.75)); } }
+#cmdrRow { position: absolute; top: 188px; right: 0; left: 0; display: flex; justify-content: center; align-items: flex-start; gap: 40px; }
+.cmdrCol { width: 290px; display: flex; flex-direction: column; align-items: center; gap: 14px; cursor: pointer; }
+.cmdrCard { position: relative; width: 290px; height: 404px; border-radius: 14px; overflow: hidden; border: 1px solid #6A552A; background-color: #14131A; background-image: repeating-linear-gradient(126deg, #1C1B26 0px, #1C1B26 2px, #14131A 2px, #14131A 16px); }
+.cmdrCard img { width: 290px; height: 404px; object-fit: cover; display: block; }
+.cmdrCol.active .cmdrCard { border: 2px solid #C9A227; box-shadow: 0 0 26px rgba(201,162,39,0.35); }
+.cmdrCol .cn { width: 290px; text-align: center; font-size: 16px; font-weight: 700; letter-spacing: 0.08em; color: #F3EEE3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmdrCol .pn { margin-top: -6px; font-size: 13px; font-weight: 600; letter-spacing: 0.16em; color: #A79C86; }
+.cmdrCol.active .pn { color: #C9A227; }
+#cardZoom { position: absolute; top: 0; left: 0; width: 1586px; height: 992px; z-index: 35; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: rgba(8,8,10,0.94); }
+#cardZoom.open { display: flex; }
+#cardZoom img { height: 840px; width: auto; border-radius: 26px; box-shadow: 0 0 60px rgba(0,0,0,0.9); }
+#cardZoom .z { font-size: 14px; letter-spacing: 0.2em; color: #A79C86; }
 #cmdCard { width: 640px; background: #0A0A0C; border: 1px solid #6A552A; border-radius: 16px; padding: 30px 34px 26px; display: flex; flex-direction: column; align-items: center; gap: 18px; box-shadow: 0 0 60px rgba(0,0,0,0.9); }
 #cmdCard.flip { transform: rotate(180deg); }
 #cmdCard h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.2em; color: #F3EEE3; text-align: center; }
@@ -255,7 +273,7 @@ button { font-family: inherit; }
       <img src="/tablet-assets/ornate-border.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 4; pointer-events: none;">
       <div style="position: absolute; top: 74px; right: 0; left: 0; text-align: center;">
         <div style="font-size: 27px; font-weight: 700; letter-spacing: 0.22em; color: #F3EEE3;">FLOATING MANA</div>
-        <div style="margin-top: 12px; font-size: 13px; letter-spacing: 0.24em; color: #A79C86;">TAP A SYMBOL TO ADD &middot; MINUS TO SPEND</div>
+        <div id="manaSub" style="margin-top: 12px; font-size: 13px; letter-spacing: 0.24em; color: #A79C86;">TAP A SYMBOL TO ADD &middot; MINUS TO SPEND</div>
       </div>
       <div style="position: absolute; top: 50%; right: 0; left: 0; transform: translateY(-50%); display: flex; justify-content: center; align-items: flex-start; gap: 44px;">
         <div style="display: flex; flex-direction: column; align-items: center; gap: 22px;">
@@ -316,11 +334,23 @@ button { font-family: inherit; }
       <img src="/tablet-assets/ornate-border.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 4; pointer-events: none;">
       <div style="position: absolute; top: 62px; right: 0; left: 0; text-align: center;">
         <div style="font-size: 27px; font-weight: 700; letter-spacing: 0.22em; color: #F3EEE3;">TOKENS</div>
-        <div style="margin-top: 10px; font-size: 13px; letter-spacing: 0.24em; color: #A79C86;">COUNT AND COUNTERS PER TOKEN</div>
+        <div id="tokSub" style="margin-top: 10px; font-size: 13px; letter-spacing: 0.24em; color: #A79C86;">COUNT AND COUNTERS PER TOKEN</div>
       </div>
       <div id="tokRow" style="position: absolute; top: 172px; right: 0; left: 0; display: flex; justify-content: center; align-items: flex-start; gap: 36px;"></div>
     </div>
+
+    <!-- SCREEN 4: COMMANDERS -->
+    <div class="screenpage" id="pgCmdrs" style="background: #0A0A0C;">
+      <img src="/tablet-assets/ornate-border.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 4; pointer-events: none;">
+      <div style="position: absolute; top: 62px; right: 0; left: 0; text-align: center;">
+        <div style="font-size: 27px; font-weight: 700; letter-spacing: 0.22em; color: #F3EEE3;">COMMANDERS</div>
+        <div style="margin-top: 10px; font-size: 13px; letter-spacing: 0.24em; color: #A79C86;">TAP A CARD TO READ IT</div>
+      </div>
+      <div id="cmdrRow"></div>
+    </div>
   </div>
+
+  <div id="cardZoom"><img id="zoomImg" alt=""><div class="z" id="zoomCap"></div></div>
 
   <div class="overlaySheet" id="cmdSheet">
     <div id="cmdCard">

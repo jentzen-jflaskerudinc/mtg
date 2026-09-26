@@ -7,12 +7,14 @@
   const stage = $('stage');
   // default: fill the tablet edge-to-edge (independent x/y scale, whole canvas stretches together
   // so the frame art stays aligned). ?fit=contain restores exact-proportion letterboxing.
+  let stageScaleX = 1;
   const FIT_CONTAIN = /[?&]fit=contain\b/.test(location.search);
   function rescale() {
     const vw = (window.visualViewport && window.visualViewport.width) || innerWidth;
     const vh = (window.visualViewport && window.visualViewport.height) || innerHeight;
     let sx = vw / 1586, sy = vh / 992;
     if (FIT_CONTAIN) sx = sy = Math.min(sx, sy);
+    stageScaleX = sx;
     stage.style.transform = `scale(${sx}, ${sy})`;
     stage.style.left = `${(vw - 1586 * sx) / 2}px`;
     stage.style.top = `${(vh - 992 * sy) / 2}px`;
@@ -23,32 +25,74 @@
   if (window.visualViewport) window.visualViewport.addEventListener('resize', rescale);
   rescale();
 
-  // ---------- three screens, circular swipe ----------
-  const strip = $('strip');
-  let page = 0; // 0 table, 1 mana, 2 tokens
-  function setPage(i) {
-    page = ((i % 3) + 3) % 3;
-    strip.style.transform = `translateX(${-1586 * page}px)`;
+  // ---------- four screens on a true loop: table -> mana -> tokens -> commanders -> table ----------
+  // Finger moving LEFT-TO-RIGHT drags the current page right and pulls the next page in from the left.
+  // Only the current page and its two neighbours are ever positioned, so every move is exactly one page.
+  const W = 1586;
+  const pages = Array.from(document.querySelectorAll('#strip > .screenpage'));
+  const N = pages.length;
+  let page = 0, animating = false;
+  const EASE = 'transform 0.34s cubic-bezier(0.22, 0.7, 0.2, 1)';
+
+  function place(offset, animate) {
+    pages.forEach((el, i) => {
+      let x;
+      if (i === page) x = offset;
+      else if (i === (page + 1) % N) x = offset - W;       // next page waits on the left
+      else if (i === (page - 1 + N) % N) x = offset + W;   // previous page waits on the right
+      else x = null;
+      el.style.transition = animate ? EASE : 'none';
+      if (x === null) { el.style.visibility = 'hidden'; el.style.transform = `translateX(${2 * W}px)`; }
+      else { el.style.visibility = 'visible'; el.style.transform = `translateX(${x}px)`; }
+    });
   }
-  let swX = null, swY = null;
+  function finish(dir) {
+    // slide the current page off (right for next, left for previous), then re-seat the loop
+    animating = true;
+    place(dir > 0 ? W : -W, true);
+    setTimeout(() => {
+      page = (page + dir + N) % N;
+      place(0, false);
+      animating = false;
+    }, 350);
+  }
+  function go(dir) { if (animating) return; place(0, false); void pages[0].offsetWidth; finish(dir); }
+  place(0, false);
+
+  const blocking = () =>
+    ['menuSheet', 'cmdSheet', 'tokSearch', 'cardZoom'].some((id) => $(id) && $(id).classList.contains('open')) ||
+    (document.activeElement && document.activeElement.tagName === 'INPUT');
+
+  let sx0 = null, sy0 = null, t0 = 0, axis = null, dragX = 0;
   document.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) return;
-    swX = e.touches[0].clientX; swY = e.touches[0].clientY;
+    if (animating || e.touches.length !== 1 || blocking()) { sx0 = null; return; }
+    if (e.target.closest && e.target.closest('button, input')) { sx0 = null; return; } // don't drag while pressing controls
+    sx0 = e.touches[0].clientX; sy0 = e.touches[0].clientY; t0 = Date.now(); axis = null; dragX = 0;
   }, { passive: true });
-  document.addEventListener('touchend', (e) => {
-    if (swX === null) return;
-    const dx = e.changedTouches[0].clientX - swX;
-    const dy = e.changedTouches[0].clientY - swY;
-    swX = swY = null;
-    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
-    if (Math.abs(dx) < 90 || Math.abs(dy) > Math.abs(dx)) return;
-    setPage(dx > 0 ? page + 1 : page - 1); // left-to-right swipe advances, circular
+  document.addEventListener('touchmove', (e) => {
+    if (sx0 === null) return;
+    const dx = e.touches[0].clientX - sx0, dy = e.touches[0].clientY - sy0;
+    if (!axis && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (axis !== 'x') return;
+    dragX = dx / (stageScaleX || 1);
+    place(dragX, false);
   }, { passive: true });
+  function endDrag() {
+    if (sx0 === null) return;
+    sx0 = null;
+    if (axis !== 'x') return;
+    const speed = Math.abs(dragX) / Math.max(Date.now() - t0, 1); // stage px per ms
+    if (Math.abs(dragX) > W * 0.18 || (speed > 0.6 && Math.abs(dragX) > 40)) finish(dragX > 0 ? 1 : -1);
+    else place(0, true); // not far enough: spring back
+  }
+  document.addEventListener('touchend', endDrag, { passive: true });
+  document.addEventListener('touchcancel', endDrag, { passive: true });
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
-    if (e.key === 'ArrowRight') setPage(page + 1);
-    if (e.key === 'ArrowLeft') setPage(page - 1);
+    if (e.key === 'ArrowRight') go(1);   // same as a left-to-right swipe
+    if (e.key === 'ArrowLeft') go(-1);
   });
+  window.__tabletPage = () => page;
 
   // ---------- shared game connection ----------
   let ws, wsOk = false, reconnectDelay = 500;
@@ -181,7 +225,20 @@
     cB.addEventListener('change', () => commit(cB));
   });
 
-  on('endTurn', 'click', () => mAct('endTurn'));
+  // End Turn: press-down animation + vibration so it feels like a physical button
+  (() => {
+    const b = $('endTurn');
+    if (!b) return;
+    const down = () => { b.classList.add('pressed'); try { navigator.vibrate && navigator.vibrate(18); } catch {} };
+    const up = () => b.classList.remove('pressed');
+    b.addEventListener('pointerdown', down);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => b.addEventListener(ev, up));
+    b.addEventListener('click', () => {
+      try { navigator.vibrate && navigator.vibrate([12, 40, 28]); } catch {}
+      b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
+      mAct('endTurn');
+    });
+  })();
 
   function setInput(inp, val) {
     if (document.activeElement !== inp && inp.value !== val) inp.value = val;
@@ -208,6 +265,8 @@
     const act = game.players[activeId()];
     renderTurnLabel(act);
     renderCmdWindow();
+    onTurnMaybeChanged();
+    renderCommanders();
   }
 
   // ---------- commander damage window ----------
@@ -256,6 +315,52 @@
     if (!list.children.length) list.innerHTML = '<div style="text-align:center;color:#5E574B;font-size:13px;letter-spacing:0.14em;">NO OPPONENTS YET</div>';
   }
 
+  // ---------- turn change: empty mana, show next player's tokens ----------
+  let lastTurnKey = null;
+  function onTurnMaybeChanged() {
+    const key = `${game.turnNumber}:${game.activeIdx}:${activeId() || ''}`;
+    if (lastTurnKey === null) { lastTurnKey = key; renderMana(); renderTokens(); return; }
+    if (key === lastTurnKey) return;
+    lastTurnKey = key;
+    emptyMana();
+    renderTokens();
+    // forget saved tokens for players who are no longer in the game
+    if (game.turnOrder.length) {
+      for (const k of Object.keys(tokensBy)) if (k !== '_table' && !game.players[k]) delete tokensBy[k];
+      saveTokens();
+    }
+  }
+
+  // ---------- commanders page ----------
+  let cmdrKey = '';
+  function renderCommanders() {
+    const row = $('cmdrRow');
+    if (!row) return;
+    const ids = game.turnOrder.filter((id) => game.players[id]);
+    const key = ids.map((id) => { const p = game.players[id]; return `${id}:${p.name}:${p.commander ? p.commander.name + p.commander.image + p.commander.art : ''}`; }).join('|') + '#' + activeId();
+    if (key === cmdrKey) return;
+    cmdrKey = key;
+    row.innerHTML = '';
+    if (!ids.length) { row.innerHTML = '<div style="margin-top: 200px; font-size: 14px; letter-spacing: 0.2em; color: #5E574B;">NO PLAYERS YET</div>'; return; }
+    ids.forEach((id) => {
+      const p = game.players[id];
+      const img = p.commander && (p.commander.image || p.commander.art);
+      const col = document.createElement('div');
+      col.className = 'cmdrCol' + (id === activeId() ? ' active' : '');
+      col.innerHTML = `<div class="cmdrCard">${img ? `<img alt="" src="${esc(img)}">` : '<div style="position:absolute;right:0;bottom:16px;left:0;text-align:center;font-size:10px;letter-spacing:0.18em;color:#5E574B;">NO COMMANDER SET</div>'}</div>` +
+        `<div class="cn">${esc(p.commander ? p.commander.name : '\u2014')}</div>` +
+        `<div class="pn">${esc(p.name.toUpperCase())}${id === activeId() ? ' \u00B7 THEIR TURN' : ''}</div>`;
+      col.addEventListener('click', () => {
+        if (!img) return;
+        $('zoomImg').src = p.commander.image || p.commander.art;
+        $('zoomCap').textContent = `${p.name.toUpperCase()} \u00B7 TAP ANYWHERE TO CLOSE`;
+        $('cardZoom').classList.add('open');
+      });
+      row.appendChild(col);
+    });
+  }
+  on('cardZoom', 'click', () => $('cardZoom').classList.remove('open'));
+
   function renderTurnLabel(act) {
     act = act || game.players[activeId()];
     let text = act ? `${act.name.toUpperCase()}'S TURN` : "PLAYER'S TURN";
@@ -291,7 +396,10 @@
   let mana = { w: 0, u: 0, b: 0, r: 0, g: 0, c: 0 };
   try { mana = Object.assign(mana, JSON.parse(store.getItem('tabletMana') || '{}')); } catch {}
   function saveMana() { store.setItem('tabletMana', JSON.stringify(mana)); }
+  function emptyMana() { mana = { w: 0, u: 0, b: 0, r: 0, g: 0, c: 0 }; saveMana(); renderMana(); }
   function renderMana() {
+    const ap = game.players[activeId()];
+    if ($('manaSub')) $('manaSub').textContent = (ap ? ap.name.toUpperCase() + ' \u00B7 ' : '') + 'TAP A SYMBOL TO ADD \u00B7 MINUS TO SPEND';
     let total = 0;
     document.querySelectorAll('.mVal').forEach((el) => {
       const k = el.dataset.k;
@@ -302,19 +410,25 @@
   }
   document.querySelectorAll('.mAdd').forEach((b) => holdable(b, () => { mana[b.dataset.k] = Math.min(mana[b.dataset.k] + 1, 99); saveMana(); renderMana(); }));
   document.querySelectorAll('.mSub').forEach((b) => holdable(b, () => { mana[b.dataset.k] = Math.max(mana[b.dataset.k] - 1, 0); saveMana(); renderMana(); }));
-  on('emptyPool', 'click', () => { mana = { w: 0, u: 0, b: 0, r: 0, g: 0, c: 0 }; saveMana(); renderMana(); });
+  on('emptyPool', 'click', emptyMana);
   renderMana();
 
   // ---------- tokens screen (local to this device, persisted) ----------
-  let tokens = [];
-  try { tokens = JSON.parse(store.getItem('tabletTokens') || '[]'); } catch {}
-  function saveTokens() { store.setItem('tabletTokens', JSON.stringify(tokens)); }
+  // tokens are remembered per player; the screen always shows whoever's turn it is
+  let tokensBy = {};
+  try { tokensBy = JSON.parse(store.getItem('tabletTokensBy') || '{}') || {}; } catch {}
+  const tokKey = () => activeId() || '_table';
+  function curTokens() { const k = tokKey(); if (!Array.isArray(tokensBy[k])) tokensBy[k] = []; return tokensBy[k]; }
+  function saveTokens() { store.setItem('tabletTokensBy', JSON.stringify(tokensBy)); }
 
   const NUM62 = "font-family: 'Peteroy', Georgia, serif; font-size: 62px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; min-width: 54px; text-align: center;";
   const NUM40 = NUM62.replace('62px', '40px');
   const STEPBTN = 'width: 46px; height: 46px; padding: 0; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 30px; line-height: 1; cursor: pointer;';
 
   function renderTokens() {
+    const tokens = curTokens();
+    const ap = game.players[activeId()];
+    if ($('tokSub')) $('tokSub').textContent = (ap ? ap.name.toUpperCase() + ' \u00B7 ' : '') + 'COUNT AND COUNTERS PER TOKEN';
     const row = $('tokRow');
     row.innerHTML = '';
     tokens.forEach((tk, i) => {
@@ -390,7 +504,7 @@
           div.className = 'tr';
           div.innerHTML = `<img src="${esc(uris.art_crop || uris.normal || '')}" alt=""><span>${esc(card.name)}${card.power ? ` ${esc(card.power)}/${esc(card.toughness)}` : ''}</span>`;
           div.addEventListener('click', () => {
-            tokens.push({ name: card.name + (card.power ? ` ${card.power}/${card.toughness}` : ''), img: uris.art_crop || uris.normal || '', count: 1, counters: 0 });
+            curTokens().push({ name: card.name + (card.power ? ` ${card.power}/${card.toughness}` : ''), img: uris.art_crop || uris.normal || '', count: 1, counters: 0 });
             saveTokens();
             renderTokens();
             $('tokSearch').classList.remove('open');
