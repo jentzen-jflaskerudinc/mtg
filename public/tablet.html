@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MTG Life Tracker &mdash; Tablet</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&amp;display=swap" rel="stylesheet">
+<style>
+@font-face { font-family: 'Peteroy'; src: url(/tablet-assets/Peteroy.woff2) format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+input::placeholder { color: #A79C86; opacity: 1; letter-spacing: 0.09em; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { background: #08080A; font-family: 'Cinzel', Georgia, serif; -webkit-tap-highlight-color: transparent; }
+a { color: #D8B45C; } a:hover { color: #EFD08A; }
+button { font-family: inherit; }
+#stage { position: absolute; width: 1586px; height: 992px; transform-origin: top left; }
+#strip { position: absolute; top: 0; left: 0; width: 4758px; height: 992px; display: flex; transition: transform 0.32s ease; }
+.screenpage { position: relative; width: 1586px; height: 992px; flex: none; box-sizing: border-box; background: #08080A; color: #EFEAE0; overflow: hidden; }
+.overlaySheet { position: absolute; top: 0; left: 0; width: 1586px; height: 992px; z-index: 30; display: none; align-items: center; justify-content: center; background: rgba(8,8,10,0.9); }
+.overlaySheet.open { display: flex; }
+.menuCard { width: 460px; background: #0A0A0C; border: 1px solid #6A552A; border-radius: 14px; padding: 34px 30px; display: flex; flex-direction: column; gap: 14px; }
+.menuCard h2 { margin: 0 0 6px; text-align: center; font-size: 16px; font-weight: 700; letter-spacing: 0.24em; color: #F3EEE3; }
+.menuCard button { height: 52px; border: 1px solid #6A552A; border-radius: 8px; background: rgba(10,10,12,0.8); color: #E7DFCE; font-size: 14px; letter-spacing: 0.18em; cursor: pointer; }
+.menuCard button.danger { border-color: #5c2a22; color: #C98A7E; }
+#tokSearchCard { width: 620px; max-height: 800px; background: #0A0A0C; border: 1px solid #6A552A; border-radius: 14px; padding: 30px; display: flex; flex-direction: column; gap: 16px; }
+#tokSearchCard h2 { margin: 0; text-align: center; font-size: 16px; font-weight: 700; letter-spacing: 0.24em; color: #F3EEE3; }
+#tokQ { height: 52px; box-sizing: border-box; padding: 0 16px; text-align: center; border: 1px solid #6A552A; border-radius: 8px; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 18px; letter-spacing: 0.08em; outline: none; }
+#tokResults { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 560px; }
+#tokResults .tr { display: flex; align-items: center; gap: 14px; padding: 8px 10px; border: 1px solid #2a2520; border-radius: 8px; cursor: pointer; }
+#tokResults .tr:active { border-color: #6A552A; }
+#tokResults .tr img { width: 72px; height: 52px; object-fit: cover; border-radius: 5px; border: 1px solid #6A552A; }
+#tokResults .tr span { color: #F3EEE3; font-size: 15px; letter-spacing: 0.06em; }
+#joinOv { position: absolute; top: 0; left: 0; width: 1586px; height: 992px; z-index: 25; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 26px; background: #08080A; }
+#joinOv.open { display: flex; }
+#joinOv h1 { margin: 0; font-size: 38px; font-weight: 700; letter-spacing: 0.28em; color: #F3EEE3; }
+#joinOv .u { font-size: 24px; letter-spacing: 0.1em; color: #A79C86; border: 1px solid #6A552A; border-radius: 10px; padding: 12px 26px; }
+#qr { background: #fff; padding: 12px; border-radius: 10px; }
+#connDot { position: fixed; top: 10px; left: 10px; width: 9px; height: 9px; border-radius: 50%; background: #DC5A42; z-index: 90; opacity: 0.9; }
+#connDot.on { opacity: 0; }
+#toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 95; background: rgba(10,10,12,0.94); border: 1px solid #6A552A; color: #E7DFCE; padding: 12px 22px; border-radius: 10px; font-size: 14px; letter-spacing: 0.08em; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+#toast.show { opacity: 1; }
+.cmdOv .rowline { display: flex; align-items: center; gap: 18px; }
+.cmdOv .rowline .nm { width: 190px; text-align: right; color: #F3EEE3; font-size: 15px; font-weight: 600; letter-spacing: 0.1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmdOv .rowline button { width: 52px; height: 52px; border: none; background: transparent; color: #E7DFCE; font-size: 34px; line-height: 1; cursor: pointer; text-shadow: 0 2px 12px rgba(8,8,10,0.9); }
+.cmdOv .rowline b { font-family: 'Peteroy', Georgia, serif; font-size: 40px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); color: #F9F5EC; min-width: 60px; text-align: center; }
+.cmdOv .rowline b.lethal { color: #DC5A42; }
+</style>
+</head>
+<body>
+<div id="connDot"></div>
+<div id="stage">
+  <div id="strip">
+
+    <!-- SCREEN 1: TABLE -->
+    <div class="screenpage" id="pgTable">
+    <div class="seat" data-cell="0" style="position: absolute; left: 20px; top: 494px; width: 766px; height: 478px; overflow: hidden; background: #0A0A0C; -webkit-mask-image: radial-gradient(circle at 779px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at 779px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
+
+      <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+        <div class="seatArt" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9);"></div>
+        <div aria-hidden="true" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(180deg, rgba(8,8,10,0.62) 0%, rgba(8,8,10,0.30) 30%, rgba(8,8,10,0.30) 70%, rgba(8,8,10,0.62) 100%), radial-gradient(ellipse at center, rgba(8,8,10,0.18) 40%, rgba(8,8,10,0.60) 100%);"></div>
+        <div style="position: absolute; top: 26px; left: 44px; width: 420px; display: flex; justify-content: center;">
+          <input type="text" class="cmdA" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 420px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; bottom: 33px; right: 0; left: 0; display: flex; justify-content: center; transform: rotate(180deg);">
+          <input type="text" class="cmdB" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 400px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; top: 138px; right: 77px; width: 150px; transform: rotate(45deg); transform-origin: center; display: flex; justify-content: center;">
+          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 150px; height: 28px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #A79C86; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+          <div style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
+            <span class="lifeVal" style="font-family: 'Peteroy', Georgia, serif; font-size: 138px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; letter-spacing: 0.01em; text-shadow: 0 4px 22px rgba(8,8,10,0.95), 0 0 46px rgba(8,8,10,0.7);"></span>
+          </div>
+          <button type="button" class="m5" style="position: absolute; bottom: 26px; left: 29px; width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">-5</button>
+          <button type="button" class="p5" style="position: absolute; bottom: 26px; right: 29px; width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+5</button>
+
+          <button type="button" class="m1" aria-label="Lose one life" style="position: absolute; top: 50%; left: 34px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">&minus;</button>
+
+          <button type="button" class="p1" aria-label="Gain one life" style="position: absolute; top: 50%; right: 34px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+</button>
+
+          <div style="position: absolute; top: calc(50% + 92px); left: 0; right: 0; display: flex; justify-content: center; gap: 34px;"><button type="button" class="cmdBtn" style="width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">CMD</button></div>
+        </div>
+
+        <div class="cmdOv" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; display: none; background: rgba(8,8,10,0.94); flex-direction: column; align-items: center; justify-content: center; gap: 18px;">
+          <div style="font-size: 14px; font-weight: 700; letter-spacing: 0.22em; color: #A79C86;">COMMANDER DAMAGE TAKEN</div>
+          <div class="cmdRows" style="display: flex; flex-direction: column; gap: 12px;"></div>
+          <button type="button" class="cmdDone" style="margin-top: 6px; height: 44px; padding: 0 34px; border: 1px solid #6A552A; border-radius: 23px; background: rgba(10,10,12,0.8); color: #E7DFCE; font-family: inherit; font-size: 14px; letter-spacing: 0.2em; cursor: pointer;">DONE</button>
+        </div>
+      </div>
+    </div>
+    <div class="seat" data-cell="1" style="position: absolute; left: 804px; top: 494px; width: 762px; height: 478px; overflow: hidden; background: #0A0A0C; -webkit-mask-image: radial-gradient(circle at -5px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at -5px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
+
+      <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+        <div class="seatArt" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9);"></div>
+        <div aria-hidden="true" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(180deg, rgba(8,8,10,0.62) 0%, rgba(8,8,10,0.30) 30%, rgba(8,8,10,0.30) 70%, rgba(8,8,10,0.62) 100%), radial-gradient(ellipse at center, rgba(8,8,10,0.18) 40%, rgba(8,8,10,0.60) 100%);"></div>
+        <div style="position: absolute; top: 26px; right: 44px; width: 420px; display: flex; justify-content: center;">
+          <input type="text" class="cmdA" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 420px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; bottom: 33px; right: 0; left: 0; display: flex; justify-content: center; transform: rotate(180deg);">
+          <input type="text" class="cmdB" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 400px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; top: 138px; left: 77px; width: 150px; transform: rotate(-45deg); transform-origin: center; display: flex; justify-content: center;">
+          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 150px; height: 28px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #A79C86; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+          <div style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
+            <span class="lifeVal" style="font-family: 'Peteroy', Georgia, serif; font-size: 138px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; letter-spacing: 0.01em; text-shadow: 0 4px 22px rgba(8,8,10,0.95), 0 0 46px rgba(8,8,10,0.7);"></span>
+          </div>
+          <button type="button" class="m5" style="position: absolute; bottom: 26px; left: 29px; width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">-5</button>
+          <button type="button" class="p5" style="position: absolute; bottom: 26px; right: 29px; width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+5</button>
+
+          <button type="button" class="m1" aria-label="Lose one life" style="position: absolute; top: 50%; left: 34px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">&minus;</button>
+
+          <button type="button" class="p1" aria-label="Gain one life" style="position: absolute; top: 50%; right: 34px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+</button>
+
+          <div style="position: absolute; top: calc(50% + 92px); left: 0; right: 0; display: flex; justify-content: center; gap: 34px;"><button type="button" class="cmdBtn" style="width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">CMD</button></div>
+        </div>
+
+        <div class="cmdOv" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; display: none; background: rgba(8,8,10,0.94); flex-direction: column; align-items: center; justify-content: center; gap: 18px;">
+          <div style="font-size: 14px; font-weight: 700; letter-spacing: 0.22em; color: #A79C86;">COMMANDER DAMAGE TAKEN</div>
+          <div class="cmdRows" style="display: flex; flex-direction: column; gap: 12px;"></div>
+          <button type="button" class="cmdDone" style="margin-top: 6px; height: 44px; padding: 0 34px; border: 1px solid #6A552A; border-radius: 23px; background: rgba(10,10,12,0.8); color: #E7DFCE; font-family: inherit; font-size: 14px; letter-spacing: 0.2em; cursor: pointer;">DONE</button>
+        </div>
+      </div>
+    </div>
+    <div class="seat" data-cell="2" style="position: absolute; left: 804px; top: 20px; width: 762px; height: 457px; overflow: hidden; background: #0A0A0C; -webkit-mask-image: radial-gradient(circle at -5px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at -5px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
+
+      <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: rotate(180deg);">
+        <div class="seatArt" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9);"></div>
+        <div aria-hidden="true" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(180deg, rgba(8,8,10,0.62) 0%, rgba(8,8,10,0.30) 30%, rgba(8,8,10,0.30) 70%, rgba(8,8,10,0.62) 100%), radial-gradient(ellipse at center, rgba(8,8,10,0.18) 40%, rgba(8,8,10,0.60) 100%);"></div>
+        <div style="position: absolute; top: 26px; left: 44px; width: 420px; display: flex; justify-content: center;">
+          <input type="text" class="cmdA" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 420px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; bottom: 33px; right: 0; left: 0; display: flex; justify-content: center; transform: rotate(180deg);">
+          <input type="text" class="cmdB" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 400px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; top: 138px; right: 77px; width: 150px; transform: rotate(45deg); transform-origin: center; display: flex; justify-content: center;">
+          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 150px; height: 28px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #A79C86; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+          <div style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
+            <span class="lifeVal" style="font-family: 'Peteroy', Georgia, serif; font-size: 138px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; letter-spacing: 0.01em; text-shadow: 0 4px 22px rgba(8,8,10,0.95), 0 0 46px rgba(8,8,10,0.7);"></span>
+          </div>
+          <button type="button" class="m5" style="position: absolute; bottom: 26px; left: 29px; width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">-5</button>
+          <button type="button" class="p5" style="position: absolute; bottom: 26px; right: 29px; width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+5</button>
+
+          <button type="button" class="m1" aria-label="Lose one life" style="position: absolute; top: 50%; left: 34px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">&minus;</button>
+
+          <button type="button" class="p1" aria-label="Gain one life" style="position: absolute; top: 50%; right: 34px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+</button>
+
+          <div style="position: absolute; top: calc(50% + 92px); left: 0; right: 0; display: flex; justify-content: center; gap: 34px;"><button type="button" class="cmdBtn" style="width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">CMD</button></div>
+        </div>
+
+        <div class="cmdOv" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; display: none; background: rgba(8,8,10,0.94); flex-direction: column; align-items: center; justify-content: center; gap: 18px;">
+          <div style="font-size: 14px; font-weight: 700; letter-spacing: 0.22em; color: #A79C86;">COMMANDER DAMAGE TAKEN</div>
+          <div class="cmdRows" style="display: flex; flex-direction: column; gap: 12px;"></div>
+          <button type="button" class="cmdDone" style="margin-top: 6px; height: 44px; padding: 0 34px; border: 1px solid #6A552A; border-radius: 23px; background: rgba(10,10,12,0.8); color: #E7DFCE; font-family: inherit; font-size: 14px; letter-spacing: 0.2em; cursor: pointer;">DONE</button>
+        </div>
+      </div>
+    </div>
+    <div class="seat" data-cell="3" style="position: absolute; left: 20px; top: 20px; width: 766px; height: 457px; overflow: hidden; background: #0A0A0C; -webkit-mask-image: radial-gradient(circle at 779px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at 779px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
+
+      <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: rotate(180deg);">
+        <div class="seatArt" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9);"></div>
+        <div aria-hidden="true" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(180deg, rgba(8,8,10,0.62) 0%, rgba(8,8,10,0.30) 30%, rgba(8,8,10,0.30) 70%, rgba(8,8,10,0.62) 100%), radial-gradient(ellipse at center, rgba(8,8,10,0.18) 40%, rgba(8,8,10,0.60) 100%);"></div>
+        <div style="position: absolute; top: 26px; right: 44px; width: 420px; display: flex; justify-content: center;">
+          <input type="text" class="cmdA" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 420px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; bottom: 33px; right: 0; left: 0; display: flex; justify-content: center; transform: rotate(180deg);">
+          <input type="text" class="cmdB" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 400px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; top: 138px; left: 77px; width: 150px; transform: rotate(-45deg); transform-origin: center; display: flex; justify-content: center;">
+          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 150px; height: 28px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #A79C86; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+
+        <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+          <div style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
+            <span class="lifeVal" style="font-family: 'Peteroy', Georgia, serif; font-size: 138px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; letter-spacing: 0.01em; text-shadow: 0 4px 22px rgba(8,8,10,0.95), 0 0 46px rgba(8,8,10,0.7);"></span>
+          </div>
+          <button type="button" class="m5" style="position: absolute; bottom: 26px; left: 29px; width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">-5</button>
+          <button type="button" class="p5" style="position: absolute; bottom: 26px; right: 29px; width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+5</button>
+
+          <button type="button" class="m1" aria-label="Lose one life" style="position: absolute; top: 50%; left: 34px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">&minus;</button>
+
+          <button type="button" class="p1" aria-label="Gain one life" style="position: absolute; top: 50%; right: 34px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+</button>
+
+          <div style="position: absolute; top: calc(50% + 92px); left: 0; right: 0; display: flex; justify-content: center; gap: 34px;"><button type="button" class="cmdBtn" style="width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">CMD</button></div>
+        </div>
+
+        <div class="cmdOv" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; display: none; background: rgba(8,8,10,0.94); flex-direction: column; align-items: center; justify-content: center; gap: 18px;">
+          <div style="font-size: 14px; font-weight: 700; letter-spacing: 0.22em; color: #A79C86;">COMMANDER DAMAGE TAKEN</div>
+          <div class="cmdRows" style="display: flex; flex-direction: column; gap: 12px;"></div>
+          <button type="button" class="cmdDone" style="margin-top: 6px; height: 44px; padding: 0 34px; border: 1px solid #6A552A; border-radius: 23px; background: rgba(10,10,12,0.8); color: #E7DFCE; font-family: inherit; font-size: 14px; letter-spacing: 0.2em; cursor: pointer;">DONE</button>
+        </div>
+      </div>
+    </div>
+
+      <div aria-hidden="true" style="position: absolute; left: 799px; top: 483px; width: 332px; height: 332px; margin: -166px 0 0 -166px; border-radius: 50%; background: #0A0A0C;"></div>
+
+      <img src="/tablet-assets/table-frame-overlay.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 6; pointer-events: none;">
+
+      <div style="position: absolute; left: 799px; top: 483px; width: 300px; height: 0; margin-left: -150px; z-index: 12;">
+        <div id="turnLabel" style="position: absolute; left: 0; right: 0; bottom: 44px; text-align: center; font-size: 15px; font-weight: 700; letter-spacing: 0.11em; color: #F3EEE3;">PLAYER&#39;S TURN</div>
+        <div style="position: absolute; left: 0; right: 0; top: -32px; height: 63px; display: flex; justify-content: center;">
+          <button type="button" id="endTurn" style="width: 220px; height: 63px; padding: 0; border: none; background: transparent; cursor: pointer; display: block;"><img src="/tablet-assets/end-turn-button.png" alt="End turn" style="width: 220px; height: 63px; display: block; pointer-events: none;"></button>
+        </div>
+        <div style="position: absolute; left: 0; right: 0; top: 62px; display: flex; justify-content: center; transform: translateX(-3px);">
+          <button type="button" id="menuBtn" aria-label="Menu" style="width: 46px; height: 46px; border-radius: 50%; border: 1px solid #6A552A; background: rgba(10,10,12,0.8); color: #E7DFCE; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="joinOv">
+        <h1>COMMANDER</h1>
+        <div class="u" id="joinUrl"></div>
+        <div id="qr"></div>
+        <div style="font-size: 13px; letter-spacing: 0.22em; color: #A79C86;">SCAN WITH YOUR PHONE TO JOIN</div>
+      </div>
+    </div>
+
+    <!-- SCREEN 2: FLOATING MANA -->
+    <div class="screenpage" id="pgMana" style="background: #0A0A0C;">
+      <img src="/tablet-assets/ornate-border.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 4; pointer-events: none;">
+      <div style="position: absolute; top: 74px; right: 0; left: 0; text-align: center;">
+        <div style="font-size: 27px; font-weight: 700; letter-spacing: 0.22em; color: #F3EEE3;">FLOATING MANA</div>
+        <div style="margin-top: 12px; font-size: 13px; letter-spacing: 0.24em; color: #A79C86;">TAP A SYMBOL TO ADD &middot; MINUS TO SPEND</div>
+      </div>
+      <div style="position: absolute; top: 50%; right: 0; left: 0; transform: translateY(-50%); display: flex; justify-content: center; align-items: flex-start; gap: 44px;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 22px;">
+          <button type="button" class="mAdd" data-k="w" aria-label="Add one white mana" style="width: 132px; height: 132px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer;">
+            <img src="/tablet-assets/mana-white.png" alt="" style="width: 132px; height: 132px; display: block; pointer-events: none;">
+          </button>
+          <span class="mVal" data-k="w" style="font-family: 'Peteroy', Georgia, serif; font-size: 108px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; text-shadow: 0 4px 22px rgba(8,8,10,0.95);">0</span>
+          <button type="button" class="mSub" data-k="w" aria-label="Spend one white mana" style="width: 96px; height: 56px; padding: 0; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 44px; line-height: 1; cursor: pointer;">&minus;</button>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 22px;">
+          <button type="button" class="mAdd" data-k="u" aria-label="Add one blue mana" style="width: 132px; height: 132px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer;">
+            <img src="/tablet-assets/mana-blue.png" alt="" style="width: 132px; height: 132px; display: block; pointer-events: none;">
+          </button>
+          <span class="mVal" data-k="u" style="font-family: 'Peteroy', Georgia, serif; font-size: 108px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; text-shadow: 0 4px 22px rgba(8,8,10,0.95);">0</span>
+          <button type="button" class="mSub" data-k="u" aria-label="Spend one blue mana" style="width: 96px; height: 56px; padding: 0; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 44px; line-height: 1; cursor: pointer;">&minus;</button>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 22px;">
+          <button type="button" class="mAdd" data-k="b" aria-label="Add one black mana" style="width: 132px; height: 132px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer;">
+            <img src="/tablet-assets/mana-black.png" alt="" style="width: 132px; height: 132px; display: block; pointer-events: none;">
+          </button>
+          <span class="mVal" data-k="b" style="font-family: 'Peteroy', Georgia, serif; font-size: 108px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; text-shadow: 0 4px 22px rgba(8,8,10,0.95);">0</span>
+          <button type="button" class="mSub" data-k="b" aria-label="Spend one black mana" style="width: 96px; height: 56px; padding: 0; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 44px; line-height: 1; cursor: pointer;">&minus;</button>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 22px;">
+          <button type="button" class="mAdd" data-k="r" aria-label="Add one red mana" style="width: 132px; height: 132px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer;">
+            <img src="/tablet-assets/mana-red.png" alt="" style="width: 132px; height: 132px; display: block; pointer-events: none;">
+          </button>
+          <span class="mVal" data-k="r" style="font-family: 'Peteroy', Georgia, serif; font-size: 108px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; text-shadow: 0 4px 22px rgba(8,8,10,0.95);">0</span>
+          <button type="button" class="mSub" data-k="r" aria-label="Spend one red mana" style="width: 96px; height: 56px; padding: 0; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 44px; line-height: 1; cursor: pointer;">&minus;</button>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 22px;">
+          <button type="button" class="mAdd" data-k="g" aria-label="Add one green mana" style="width: 132px; height: 132px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer;">
+            <img src="/tablet-assets/mana-green.png" alt="" style="width: 132px; height: 132px; display: block; pointer-events: none;">
+          </button>
+          <span class="mVal" data-k="g" style="font-family: 'Peteroy', Georgia, serif; font-size: 108px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; text-shadow: 0 4px 22px rgba(8,8,10,0.95);">0</span>
+          <button type="button" class="mSub" data-k="g" aria-label="Spend one green mana" style="width: 96px; height: 56px; padding: 0; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 44px; line-height: 1; cursor: pointer;">&minus;</button>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 22px;">
+          <button type="button" class="mAdd" data-k="c" aria-label="Add one colorless mana" style="width: 132px; height: 132px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer;">
+            <img src="/tablet-assets/mana-colorless.png" alt="" style="width: 132px; height: 132px; display: block; pointer-events: none;">
+          </button>
+          <span class="mVal" data-k="c" style="font-family: 'Peteroy', Georgia, serif; font-size: 108px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; text-shadow: 0 4px 22px rgba(8,8,10,0.95);">0</span>
+          <button type="button" class="mSub" data-k="c" aria-label="Spend one colorless mana" style="width: 96px; height: 56px; padding: 0; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 44px; line-height: 1; cursor: pointer;">&minus;</button>
+        </div>
+      </div>
+      <div style="position: absolute; right: 0; bottom: 80px; left: 0; display: flex; justify-content: center; align-items: center; gap: 40px;">
+        <div style="display: flex; align-items: baseline; gap: 14px;">
+          <span style="font-size: 13px; letter-spacing: 0.22em; color: #A79C86;">IN POOL</span>
+          <span id="poolTotal" style="font-family: 'Peteroy', Georgia, serif; font-size: 46px; font-weight: 400; line-height: 1; color: #F3EEE3;">0</span>
+        </div>
+        <span aria-hidden="true" style="width: 1px; height: 34px; background: #3A352A;"></span>
+        <button type="button" id="emptyPool" style="height: 46px; padding: 0 8px; border: none; background: transparent; color: #A79C86; font-family: inherit; font-size: 14px; letter-spacing: 0.2em; cursor: pointer;">EMPTY POOL</button>
+      </div>
+    </div>
+
+    <!-- SCREEN 3: TOKENS -->
+    <div class="screenpage" id="pgTokens" style="background: #0A0A0C;">
+      <img src="/tablet-assets/ornate-border.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 4; pointer-events: none;">
+      <div style="position: absolute; top: 62px; right: 0; left: 0; text-align: center;">
+        <div style="font-size: 27px; font-weight: 700; letter-spacing: 0.22em; color: #F3EEE3;">TOKENS</div>
+        <div style="margin-top: 10px; font-size: 13px; letter-spacing: 0.24em; color: #A79C86;">COUNT AND COUNTERS PER TOKEN</div>
+      </div>
+      <div id="tokRow" style="position: absolute; top: 172px; right: 0; left: 0; display: flex; justify-content: center; align-items: flex-start; gap: 36px;"></div>
+    </div>
+  </div>
+
+  <div class="overlaySheet" id="menuSheet">
+    <div class="menuCard">
+      <h2>TABLE MENU</h2>
+      <button type="button" id="mRotate">ROTATE SEATING</button>
+      <button type="button" id="mTimerStart">GLOBAL TIMER&hellip;</button>
+      <button type="button" id="mTimerStop">TIMER OFF</button>
+      <button type="button" id="mResetLife">RESET LIFE</button>
+      <button type="button" class="danger" id="mNewGame">NEW GAME</button>
+      <button type="button" id="mClose">CLOSE</button>
+    </div>
+  </div>
+
+  <div class="overlaySheet" id="tokSearch">
+    <div id="tokSearchCard">
+      <h2>SEARCH SCRYFALL</h2>
+      <input type="text" id="tokQ" placeholder="Token name&hellip;" autocomplete="off">
+      <div id="tokResults"></div>
+      <button type="button" id="tokClose" style="height: 46px; border: 1px solid #6A552A; border-radius: 8px; background: rgba(10,10,12,0.8); color: #A79C86; font-size: 13px; letter-spacing: 0.2em; cursor: pointer;">CLOSE</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/tablet.js"></script>
+</body>
+</html>
