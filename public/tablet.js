@@ -364,6 +364,17 @@
     }, 350);
   });
 
+  // ---------- fullscreen: installed app launches fullscreen; in-browser, first tap goes fullscreen ----------
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  function goFullscreen() {
+    const el = document.documentElement;
+    if (document.fullscreenElement || !el.requestFullscreen) return;
+    el.requestFullscreen({ navigationUI: 'hide' })
+      .then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch {} })
+      .catch(() => {});
+  }
+  document.addEventListener('pointerdown', goFullscreen, { capture: true });
+
   // ---------- keep the kiosk awake ----------
   let wakeLock = null;
   async function keepAwake() {
