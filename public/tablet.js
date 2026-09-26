@@ -60,7 +60,7 @@
   place(0, false);
 
   const blocking = () =>
-    ['menuSheet', 'cmdSheet', 'tokSearch', 'cardZoom'].some((id) => $(id) && $(id).classList.contains('open')) ||
+    ['menuSheet', 'cmdSheet', 'tokSearch', 'cardZoom', 'ctrSheet'].some((id) => $(id) && $(id).classList.contains('open')) ||
     (document.activeElement && document.activeElement.tagName === 'INPUT');
 
   let sx0 = null, sy0 = null, t0 = 0, axis = null, dragX = 0;
@@ -421,71 +421,188 @@
   function curTokens() { const k = tokKey(); if (!Array.isArray(tokensBy[k])) tokensBy[k] = []; return tokensBy[k]; }
   function saveTokens() { store.setItem('tabletTokensBy', JSON.stringify(tokensBy)); }
 
+  // ---------- token cards v2: stacked copies, big quantity badge, typed counters, custom tokens ----------
   const NUM62 = "font-family: 'Peteroy', Georgia, serif; font-size: 62px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; min-width: 54px; text-align: center;";
-  const NUM40 = NUM62.replace('62px', '40px');
-  const STEPBTN = 'width: 46px; height: 46px; padding: 0; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 30px; line-height: 1; cursor: pointer;';
+  const TK_COLORS = { W: ['#e9e2c9', '#b9ae8a'], U: ['#3d6fa8', '#1d3553'], B: ['#4a4150', '#1b171e'], R: ['#b5452f', '#5a1c12'], G: ['#3f7a45', '#1c3b20'], C: ['#8d8a86', '#4a4845'], M: ['#c9a227', '#6a552a'] };
+  const BASIC_CTRS = ['+1/+1', '-1/-1'];
+
+  // migrate / normalise saved tokens from older versions
+  function normTok(tk) {
+    if (!tk.ctr || typeof tk.ctr !== 'object') tk.ctr = {};
+    if (typeof tk.counters === 'number') { if (tk.counters > 0) tk.ctr['+1/+1'] = (tk.ctr['+1/+1'] || 0) + tk.counters; delete tk.counters; }
+    if (tk.power === undefined || tk.toughness === undefined) {
+      const m = String(tk.name || '').match(/\s(\*|-?\d+)\/(\*|-?\d+)\s*$/);
+      if (m) { tk.power = m[1]; tk.toughness = m[2]; tk.name = tk.name.slice(0, m.index); } else { tk.power = tk.power || ''; tk.toughness = tk.toughness || ''; }
+    }
+    if (typeof tk.count !== 'number') tk.count = 1;
+    if (tk.text === undefined) tk.text = '';
+    return tk;
+  }
+  Object.values(tokensBy).forEach((arr) => Array.isArray(arr) && arr.forEach(normTok));
+
+  function effPT(tk) {
+    const net = (tk.ctr['+1/+1'] || 0) - (tk.ctr['-1/-1'] || 0);
+    const p = parseInt(tk.power, 10), t = parseInt(tk.toughness, 10);
+    if (tk.power === '' && tk.toughness === '') return net ? { txt: (net > 0 ? '+' : '') + net + '/' + (net > 0 ? '+' : '') + net, cls: net > 0 ? 'up' : 'down' } : null;
+    const P = isNaN(p) ? tk.power : p + net, T = isNaN(t) ? tk.toughness : t + net;
+    return { txt: `${P}/${T}`, cls: net > 0 ? 'up' : net < 0 ? 'down' : '' };
+  }
+
+  function faceHTML(tk) {
+    if (tk.img) return `<img src="${esc(tk.img)}" alt="" class="tkImg">`;
+    const c = TK_COLORS[tk.color] || TK_COLORS.C;
+    return `<div class="tkFace" style="background: linear-gradient(160deg, ${c[0]} 0%, ${c[1]} 100%);">
+        <div class="fn">${esc(tk.name || 'Token')}</div>
+        <div class="fa">${esc(tk.text || '')}</div>
+        <div class="ft">TOKEN CREATURE</div></div>`;
+  }
+
+  function paintTok(col, tk) {
+    const n = tk.count;
+    col.classList.toggle('zero', n === 0);
+    col.querySelectorAll('.tkLayer').forEach((l, i) => { l.style.display = i < Math.min(n - 1, 3) ? 'block' : 'none'; });
+    const badge = col.querySelector('.tkBadge');
+    badge.textContent = '×' + n;
+    badge.classList.toggle('multi', n > 1);
+    col.querySelector('.tkQty').textContent = n;
+    const pt = effPT(tk), box = col.querySelector('.tkPT');
+    box.style.display = pt ? 'block' : 'none';
+    if (pt) { box.textContent = pt.txt; box.className = 'tkPT ' + pt.cls; }
+    // counter rows
+    const list = col.querySelector('.tkCtrs');
+    const types = Object.keys(tk.ctr);
+    const key = types.join('|');
+    if (list.dataset.key !== key) {
+      list.dataset.key = key;
+      list.innerHTML = '';
+      types.forEach((type) => {
+        const r = document.createElement('div');
+        r.className = 'ctrRow';
+        r.innerHTML = `<span class="cl">${esc(type.toUpperCase())}</span><button type="button" class="cm">&minus;</button><b></b><button type="button" class="cp">+</button><button type="button" class="cx" aria-label="Remove counter type">&times;</button>`;
+        holdable(r.querySelector('.cm'), () => { tk.ctr[type] = Math.max((tk.ctr[type] || 0) - 1, 0); saveTokens(); paintTok(col, tk); });
+        holdable(r.querySelector('.cp'), () => { tk.ctr[type] = Math.min((tk.ctr[type] || 0) + 1, 99); saveTokens(); paintTok(col, tk); });
+        r.querySelector('.cx').addEventListener('click', () => { delete tk.ctr[type]; saveTokens(); paintTok(col, tk); fitTokRow(); });
+        r.dataset.type = type;
+        list.appendChild(r);
+      });
+    }
+    list.querySelectorAll('.ctrRow').forEach((r) => {
+      const v = tk.ctr[r.dataset.type] || 0;
+      r.querySelector('b').textContent = v;
+      r.classList.toggle('on', v > 0);
+    });
+  }
+
+  function fitTokRow() {
+    const row = $('tokRow');
+    if (!row) return;
+    row.style.transform = 'none';
+    const w = row.scrollWidth, h = row.scrollHeight;
+    const s = Math.min(1, 1480 / Math.max(w, 1), 790 / Math.max(h, 1));
+    row.style.transform = s < 1 ? `scale(${s})` : 'none';
+  }
 
   function renderTokens() {
     const tokens = curTokens();
+    tokens.forEach(normTok);
     const ap = game.players[activeId()];
-    if ($('tokSub')) $('tokSub').textContent = (ap ? ap.name.toUpperCase() + ' \u00B7 ' : '') + 'COUNT AND COUNTERS PER TOKEN';
+    if ($('tokSub')) $('tokSub').textContent = (ap ? ap.name.toUpperCase() + ' · ' : '') + 'TOKENS STAY WITH THIS PLAYER';
     const row = $('tokRow');
+    if (!row) return;
     row.innerHTML = '';
     tokens.forEach((tk, i) => {
       const col = document.createElement('div');
-      col.style.cssText = 'width: 240px; display: flex; flex-direction: column; align-items: center; gap: 16px;';
-      const artInner = tk.img
-        ? `<img src="${esc(tk.img)}" alt="" style="width: 200px; height: 279px; object-fit: cover; display: block;">`
-        : `<div aria-hidden="true" style="position: absolute; right: 0; bottom: 14px; left: 0; text-align: center; font-size: 10px; letter-spacing: 0.18em; color: #5E574B;">[SCRYFALL ART]</div>`;
+      col.className = 'tkCol';
       col.innerHTML = `
-        <div style="position: relative; width: 200px; height: 279px; border-radius: 10px; overflow: hidden; background-color: #14131A; background-image: repeating-linear-gradient(126deg, #1C1B26 0px, #1C1B26 2px, #14131A 2px, #14131A 16px); border: 1px solid #6A552A;">
-          ${artInner}
-          <button type="button" class="tkX" aria-label="Remove token" style="position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; padding: 0; border: none; border-radius: 50%; background: rgba(8,8,10,0.72); color: #A79C86; font-family: inherit; font-size: 17px; line-height: 1; cursor: pointer;">&times;</button>
-        </div>
-        <input type="text" class="tkName" aria-label="Token name" placeholder="Token Name" style="width: 220px; height: 26px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 16px; font-weight: 700; letter-spacing: 0.08em;">
-        <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
-          <button type="button" class="tkCm" style="${STEPBTN}">&minus;</button>
-          <span class="tkCount" style="${NUM62}">${tk.count}</span>
-          <button type="button" class="tkCp" style="${STEPBTN}">+</button>
-        </div>
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
-          <span style="font-size: 10px; letter-spacing: 0.22em; color: #A79C86;">COUNTERS</span>
-          <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
-            <button type="button" class="tkKm" style="${STEPBTN}">&minus;</button>
-            <span class="tkCtr" style="${NUM40}">${tk.counters}</span>
-            <button type="button" class="tkKp" style="${STEPBTN}">+</button>
+        <div class="tkStack">
+          <div class="tkLayer" style="transform: translate(18px, -18px);"></div>
+          <div class="tkLayer" style="transform: translate(12px, -12px);"></div>
+          <div class="tkLayer" style="transform: translate(6px, -6px);"></div>
+          <div class="tkCard">${faceHTML(tk)}
+            <div class="tkBadge"></div>
+            <div class="tkPT"></div>
+            <button type="button" class="tkX" aria-label="Remove token">&times;</button>
           </div>
-        </div>`;
+        </div>
+        <input type="text" class="tkName" aria-label="Token name" placeholder="Token Name">
+        <div class="tkRowQ"><span class="lbl">QTY</span><button type="button" class="tkCm">&minus;</button><span class="tkQty" style="${NUM62.replace('62px', '48px')}"></span><button type="button" class="tkCp">+</button></div>
+        <div class="tkCtrs"></div>
+        <button type="button" class="tkAddCtr">+ COUNTER</button>`;
+      // layers reuse the art so the stack looks like real copies
+      col.querySelectorAll('.tkLayer').forEach((l) => { l.innerHTML = faceHTML(tk); });
       col.querySelector('.tkName').value = tk.name;
       col.querySelector('.tkName').addEventListener('change', (e) => { tk.name = e.target.value; saveTokens(); });
       col.querySelector('.tkX').addEventListener('click', () => { tokens.splice(i, 1); saveTokens(); renderTokens(); });
-      holdable(col.querySelector('.tkCm'), () => { tk.count = Math.max(tk.count - 1, 0); saveTokens(); col.querySelector('.tkCount').textContent = tk.count; });
-      holdable(col.querySelector('.tkCp'), () => { tk.count = Math.min(tk.count + 1, 99); saveTokens(); col.querySelector('.tkCount').textContent = tk.count; });
-      holdable(col.querySelector('.tkKm'), () => { tk.counters = Math.max(tk.counters - 1, 0); saveTokens(); col.querySelector('.tkCtr').textContent = tk.counters; });
-      holdable(col.querySelector('.tkKp'), () => { tk.counters = Math.min(tk.counters + 1, 99); saveTokens(); col.querySelector('.tkCtr').textContent = tk.counters; });
+      holdable(col.querySelector('.tkCm'), () => { tk.count = Math.max(tk.count - 1, 0); saveTokens(); paintTok(col, tk); });
+      holdable(col.querySelector('.tkCp'), () => { tk.count = Math.min(tk.count + 1, 99); saveTokens(); paintTok(col, tk); });
+      col.querySelector('.tkAddCtr').addEventListener('click', () => openCtrSheet(tk, col));
+      paintTok(col, tk);
       row.appendChild(col);
     });
 
-    // add slot
     const add = document.createElement('div');
-    add.style.cssText = 'width: 240px; display: flex; flex-direction: column; align-items: center; gap: 16px;';
+    add.className = 'tkCol';
     add.innerHTML = `
       <button type="button" id="addTok" style="width: 200px; height: 279px; padding: 0; border: 1px dashed #3A352A; border-radius: 10px; background: transparent; color: #7C7466; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; cursor: pointer;">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
         <span style="font-size: 11px; letter-spacing: 0.22em;">ADD TOKEN</span>
       </button>
-      <span style="width: 220px; text-align: center; font-size: 11px; letter-spacing: 0.1em; color: #5E574B;">SEARCH SCRYFALL</span>`;
-    add.querySelector('#addTok').addEventListener('click', () => {
-      $('tokSearch').classList.add('open');
-      $('tokQ').value = '';
-      $('tokResults').innerHTML = '';
-      setTimeout(() => $('tokQ').focus(), 200);
-    });
+      <span style="width: 220px; text-align: center; font-size: 11px; letter-spacing: 0.1em; color: #5E574B;">SCRYFALL OR CUSTOM</span>`;
+    add.querySelector('#addTok').addEventListener('click', () => openTokSheet('search'));
     row.appendChild(add);
+    fitTokRow();
   }
-  renderTokens();
 
-  // scryfall token search
+  // ---------- counter chooser ----------
+  let ctrTarget = null;
+  function openCtrSheet(tk, col) {
+    ctrTarget = { tk, col };
+    if ($('ctrOther')) $('ctrOther').value = '';
+    $('ctrSheet').classList.add('open');
+  }
+  function addCounterType(type) {
+    type = String(type || '').trim().slice(0, 18);
+    if (!ctrTarget || !type) return;
+    const { tk, col } = ctrTarget;
+    tk.ctr[type] = (tk.ctr[type] || 0) + 1;
+    saveTokens(); paintTok(col, tk); fitTokRow();
+    $('ctrSheet').classList.remove('open');
+    ctrTarget = null;
+  }
+  document.querySelectorAll('#ctrSheet .ctrPick').forEach((b) => b.addEventListener('click', () => addCounterType(b.dataset.t)));
+  on('ctrOtherAdd', 'click', () => addCounterType($('ctrOther').value));
+  on('ctrOther', 'keydown', (e) => { if (e.key === 'Enter') addCounterType($('ctrOther').value); });
+  on('ctrCancel', 'click', () => { $('ctrSheet').classList.remove('open'); ctrTarget = null; });
+  on('ctrSheet', 'click', (e) => { if (e.target.id === 'ctrSheet') { $('ctrSheet').classList.remove('open'); ctrTarget = null; } });
+
+  // ---------- add-token sheet: Scryfall search tab + custom builder tab ----------
+  let customColor = 'C';
+  function openTokSheet(tab) {
+    $('tokSearch').classList.add('open');
+    $('tokQ').value = '';
+    $('tokResults').innerHTML = '';
+    ['cName', 'cPow', 'cTou', 'cText'].forEach((id) => { if ($(id)) $(id).value = ''; });
+    setTokTab(tab);
+  }
+  function setTokTab(tab) {
+    document.querySelectorAll('.tokTab').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+    if ($('tokPaneSearch')) $('tokPaneSearch').style.display = tab === 'search' ? 'flex' : 'none';
+    if ($('tokPaneCustom')) $('tokPaneCustom').style.display = tab === 'custom' ? 'flex' : 'none';
+    setTimeout(() => { const f = $(tab === 'search' ? 'tokQ' : 'cName'); if (f) f.focus(); }, 200);
+  }
+  document.querySelectorAll('.tokTab').forEach((b) => b.addEventListener('click', () => setTokTab(b.dataset.tab)));
+  document.querySelectorAll('.cCol').forEach((b) => b.addEventListener('click', () => {
+    customColor = b.dataset.c;
+    document.querySelectorAll('.cCol').forEach((x) => x.classList.toggle('on', x === b));
+  }));
+  on('cCreate', 'click', () => {
+    const name = ($('cName').value || '').trim().slice(0, 40) || 'Token';
+    const pw = ($('cPow').value || '').trim().slice(0, 3), tg = ($('cTou').value || '').trim().slice(0, 3);
+    curTokens().push({ name, img: '', custom: true, color: customColor, power: pw, toughness: tg, text: ($('cText').value || '').trim().slice(0, 120), count: 1, ctr: {} });
+    saveTokens(); renderTokens();
+    $('tokSearch').classList.remove('open');
+  });
+
   let tokTimer;
   on('tokClose', 'click', () => $('tokSearch').classList.remove('open'));
   on('tokQ', 'input', () => {
@@ -504,17 +621,18 @@
           div.className = 'tr';
           div.innerHTML = `<img src="${esc(uris.art_crop || uris.normal || '')}" alt=""><span>${esc(card.name)}${card.power ? ` ${esc(card.power)}/${esc(card.toughness)}` : ''}</span>`;
           div.addEventListener('click', () => {
-            curTokens().push({ name: card.name + (card.power ? ` ${card.power}/${card.toughness}` : ''), img: uris.art_crop || uris.normal || '', count: 1, counters: 0 });
-            saveTokens();
-            renderTokens();
+            curTokens().push({ name: card.name, img: uris.normal || uris.art_crop || '', power: card.power || '', toughness: card.toughness || '', text: card.oracle_text || '', count: 1, ctr: {} });
+            saveTokens(); renderTokens();
             $('tokSearch').classList.remove('open');
           });
           $('tokResults').appendChild(div);
         });
-        if (!list.length) $('tokResults').innerHTML = '<div style="text-align:center;color:#5E574B;font-size:13px;letter-spacing:0.1em;">NO TOKENS FOUND</div>';
+        if (!list.length) $('tokResults').innerHTML = '<div style="text-align:center;color:#5E574B;font-size:13px;letter-spacing:0.1em;">NO TOKENS FOUND &middot; TRY THE CUSTOM TAB</div>';
       } catch {}
     }, 350);
   });
+
+  renderTokens();
 
   // ---------- fullscreen: installed app launches fullscreen; in-browser, first tap goes fullscreen ----------
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
