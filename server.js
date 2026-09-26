@@ -22,6 +22,7 @@ const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/tv', (_, res) => res.sendFile(path.join(__dirname, 'public', 'tv.html')));
 app.get('/tablet', (_, res) => res.sendFile(path.join(__dirname, 'public', 'tablet.html')));
+app.get('/tv2', (_, res) => res.sendFile(path.join(__dirname, 'public', 'tv2.html')));
 app.get('/healthz', (_, res) => res.send('ok'));
 
 // Lists sound files in public/sounds grouped by category prefix.
