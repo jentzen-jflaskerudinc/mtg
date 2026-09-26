@@ -42,6 +42,23 @@ button { font-family: inherit; }
 #connDot.on { opacity: 0; }
 #toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 95; background: rgba(10,10,12,0.94); border: 1px solid #6A552A; color: #E7DFCE; padding: 12px 22px; border-radius: 10px; font-size: 14px; letter-spacing: 0.08em; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 #toast.show { opacity: 1; }
+#cmdCard { width: 640px; background: #0A0A0C; border: 1px solid #6A552A; border-radius: 16px; padding: 30px 34px 26px; display: flex; flex-direction: column; align-items: center; gap: 18px; box-shadow: 0 0 60px rgba(0,0,0,0.9); }
+#cmdCard.flip { transform: rotate(180deg); }
+#cmdCard h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.2em; color: #F3EEE3; text-align: center; }
+#cmdCard .sub { margin-top: -8px; font-size: 12px; letter-spacing: 0.2em; color: #A79C86; text-align: center; }
+#cmdList { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.cdRow2 { display: flex; align-items: center; gap: 16px; padding: 10px 14px; border: 1px solid #2a2520; border-radius: 12px; background: rgba(255,255,255,0.02); }
+.cdRow2 .thumb { width: 92px; height: 64px; border-radius: 8px; border: 1px solid #6A552A; background-color: #14131A; background-size: cover; background-position: center 25%; flex: none; }
+.cdRow2 .who { flex: 1; min-width: 0; }
+.cdRow2 .who .pl { font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: #F3EEE3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cdRow2 .who .cm { margin-top: 4px; font-size: 11px; letter-spacing: 0.12em; color: #A79C86; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cdRow2 button { width: 60px; height: 60px; border: 1px solid #6A552A; border-radius: 50%; background: rgba(10,10,12,0.8); color: #E7DFCE; font-family: inherit; font-size: 32px; line-height: 1; cursor: pointer; flex: none; touch-action: none; }
+.cdRow2 button:active { background: rgba(201,162,39,0.25); }
+.cdRow2 b { font-family: 'Peteroy', Georgia, serif; font-size: 54px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); color: #F9F5EC; min-width: 70px; text-align: center; flex: none; }
+.cdRow2 b.lethal { color: #DC5A42; }
+.cdRow2.lethal { border-color: #5c2a22; background: rgba(220,90,66,0.06); }
+#cmdDoneBtn { margin-top: 4px; height: 50px; padding: 0 56px; border: 1px solid #6A552A; border-radius: 26px; background: rgba(10,10,12,0.8); color: #E7DFCE; font-family: inherit; font-size: 15px; letter-spacing: 0.22em; cursor: pointer; }
+#cmdCard .note { font-size: 11px; letter-spacing: 0.14em; color: #5E574B; text-align: center; }
 .cmdOv .rowline { display: flex; align-items: center; gap: 18px; }
 .cmdOv .rowline .nm { width: 190px; text-align: right; color: #F3EEE3; font-size: 15px; font-weight: 600; letter-spacing: 0.1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmdOv .rowline button { width: 52px; height: 52px; border: none; background: transparent; color: #E7DFCE; font-size: 34px; line-height: 1; cursor: pointer; text-shadow: 0 2px 12px rgba(8,8,10,0.9); }
@@ -305,6 +322,15 @@ button { font-family: inherit; }
     </div>
   </div>
 
+  <div class="overlaySheet" id="cmdSheet">
+    <div id="cmdCard">
+      <h2 id="cmdTitle">COMMANDER DAMAGE</h2>
+      <div class="sub">DAMAGE TAKEN FROM EACH COMMANDER</div>
+      <div id="cmdList"></div>
+      <button type="button" id="cmdDoneBtn">DONE</button>
+      <div class="note">21 FROM ONE COMMANDER IS LETHAL &middot; ALSO SUBTRACTED FROM LIFE</div>
+    </div>
+  </div>
   <div class="overlaySheet" id="menuSheet">
     <div class="menuCard">
       <h2>TABLE MENU</h2>

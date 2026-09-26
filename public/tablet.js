@@ -1,5 +1,6 @@
 (() => {
   const $ = (id) => document.getElementById(id);
+  const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
   const store = window.localStorage;
 
   // ---------- fixed-canvas scaling (brief section 2) ----------
@@ -145,7 +146,7 @@
     holdable(el.querySelector('.p1'), () => { const id = pid(); if (id) mAct('life', { targetId: id, delta: 1 }); });
     el.querySelector('.m5').addEventListener('click', () => { const id = pid(); if (id) mAct('life', { targetId: id, delta: -5 }); });
     el.querySelector('.p5').addEventListener('click', () => { const id = pid(); if (id) mAct('life', { targetId: id, delta: 5 }); });
-    el.querySelector('.cmdBtn').addEventListener('click', () => { if (pid()) { openCmdCell = cell; render(); $('cmdSheet').classList.add('open'); } });
+    el.querySelector('.cmdBtn').addEventListener('click', () => { if (pid()) { openCmdCell = cell; render(); if ($('cmdSheet')) $('cmdSheet').classList.add('open'); } });
     el.querySelector('.cmdDone').addEventListener('click', () => { openCmdCell = null; render(); });
 
     // player name commit
@@ -180,7 +181,7 @@
     cB.addEventListener('change', () => commit(cB));
   });
 
-  $('endTurn').addEventListener('click', () => mAct('endTurn'));
+  on('endTurn', 'click', () => mAct('endTurn'));
 
   function setInput(inp, val) {
     if (document.activeElement !== inp && inp.value !== val) inp.value = val;
@@ -210,12 +211,12 @@
   }
 
   // ---------- commander damage window ----------
-  function closeCmd() { openCmdCell = null; $('cmdSheet').classList.remove('open'); $('cmdList').dataset.key = ''; }
-  $('cmdDoneBtn').addEventListener('click', closeCmd);
-  $('cmdSheet').addEventListener('click', (e) => { if (e.target.id === 'cmdSheet') closeCmd(); });
+  function closeCmd() { openCmdCell = null; if ($('cmdSheet')) $('cmdSheet').classList.remove('open'); if ($('cmdList')) $('cmdList').dataset.key = ''; }
+  on('cmdDoneBtn', 'click', closeCmd);
+  on('cmdSheet', 'click', (e) => { if (e.target.id === 'cmdSheet') closeCmd(); });
 
   function renderCmdWindow() {
-    if (openCmdCell === null) return;
+    if (openCmdCell === null || !$('cmdSheet')) return;
     const id = cellPlayers()[openCmdCell];
     const p = id ? game.players[id] : null;
     if (!p) { closeCmd(); return; }
@@ -271,20 +272,20 @@
   setInterval(() => { if (game.timer && (game.timer.running || (game.timer.votes || []).length)) renderTurnLabel(); }, 500);
 
   // ---------- menu ----------
-  $('menuBtn').addEventListener('click', () => $('menuSheet').classList.add('open'));
-  $('mClose').addEventListener('click', () => $('menuSheet').classList.remove('open'));
-  $('mRotate').addEventListener('click', () => {
+  on('menuBtn', 'click', () => $('menuSheet').classList.add('open'));
+  on('mClose', 'click', () => $('menuSheet').classList.remove('open'));
+  on('mRotate', 'click', () => {
     seatOffset = (seatOffset + 1) % Math.max(game.turnOrder.length, 1);
     store.setItem('seatOffset', String(seatOffset));
     render();
   });
-  $('mTimerStart').addEventListener('click', () => {
+  on('mTimerStart', 'click', () => {
     const m = parseInt(prompt('Global timer — minutes per turn (1-10):', '5'), 10);
     if (m >= 1 && m <= 10) { mAct('timerStart', { seconds: m * 60 }); $('menuSheet').classList.remove('open'); }
   });
-  $('mTimerStop').addEventListener('click', () => { mAct('timerStop'); $('menuSheet').classList.remove('open'); });
-  $('mResetLife').addEventListener('click', () => { if (confirm('Reset everyone to 40 life?')) { mAct('resetLife'); $('menuSheet').classList.remove('open'); } });
-  $('mNewGame').addEventListener('click', () => { if (confirm('Wipe ALL players and start a new game?')) { mAct('newGame'); $('menuSheet').classList.remove('open'); } });
+  on('mTimerStop', 'click', () => { mAct('timerStop'); $('menuSheet').classList.remove('open'); });
+  on('mResetLife', 'click', () => { if (confirm('Reset everyone to 40 life?')) { mAct('resetLife'); $('menuSheet').classList.remove('open'); } });
+  on('mNewGame', 'click', () => { if (confirm('Wipe ALL players and start a new game?')) { mAct('newGame'); $('menuSheet').classList.remove('open'); } });
 
   // ---------- mana screen (local to this device, persisted) ----------
   let mana = { w: 0, u: 0, b: 0, r: 0, g: 0, c: 0 };
@@ -301,7 +302,7 @@
   }
   document.querySelectorAll('.mAdd').forEach((b) => holdable(b, () => { mana[b.dataset.k] = Math.min(mana[b.dataset.k] + 1, 99); saveMana(); renderMana(); }));
   document.querySelectorAll('.mSub').forEach((b) => holdable(b, () => { mana[b.dataset.k] = Math.max(mana[b.dataset.k] - 1, 0); saveMana(); renderMana(); }));
-  $('emptyPool').addEventListener('click', () => { mana = { w: 0, u: 0, b: 0, r: 0, g: 0, c: 0 }; saveMana(); renderMana(); });
+  on('emptyPool', 'click', () => { mana = { w: 0, u: 0, b: 0, r: 0, g: 0, c: 0 }; saveMana(); renderMana(); });
   renderMana();
 
   // ---------- tokens screen (local to this device, persisted) ----------
@@ -372,8 +373,8 @@
 
   // scryfall token search
   let tokTimer;
-  $('tokClose').addEventListener('click', () => $('tokSearch').classList.remove('open'));
-  $('tokQ').addEventListener('input', () => {
+  on('tokClose', 'click', () => $('tokSearch').classList.remove('open'));
+  on('tokQ', 'input', () => {
     clearTimeout(tokTimer);
     const q = $('tokQ').value.trim();
     if (q.length < 2) { $('tokResults').innerHTML = ''; return; }
@@ -425,5 +426,5 @@
   });
   keepAwake();
 
-  connect();
+  try { connect(); } catch (e) { console.error(e); }
 })();
