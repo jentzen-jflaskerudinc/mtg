@@ -21,6 +21,7 @@ const DEFAULT_TIMER_SECONDS = 300;
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/tv', (_, res) => res.sendFile(path.join(__dirname, 'public', 'tv.html')));
+app.get('/tablet', (_, res) => res.sendFile(path.join(__dirname, 'public', 'tablet.html')));
 app.get('/healthz', (_, res) => res.send('ok'));
 
 // Lists sound files in public/sounds grouped by category prefix.
@@ -214,6 +215,23 @@ function handleMaster(ws, msg) {
     case 'removePlayer':
       removePlayer(msg.targetId);
       break;
+    case 'rename': {
+      const p = state.players[msg.targetId];
+      const name = String(msg.name || '').trim().slice(0, 24);
+      if (p && name) p.name = name;
+      break;
+    }
+    case 'setCommander': {
+      const p = state.players[msg.targetId];
+      if (p && msg.commander && typeof msg.commander === 'object') {
+        p.commander = {
+          name: String(msg.commander.name || '').slice(0, 100),
+          art: String(msg.commander.art || '').slice(0, 400),
+          image: String(msg.commander.image || '').slice(0, 400),
+        };
+      }
+      break;
+    }
     case 'timerStart':
       startTimer(msg.seconds, 'global');
       break;
