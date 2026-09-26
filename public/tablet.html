@@ -18,7 +18,7 @@ a { color: #D8B45C; } a:hover { color: #EFD08A; }
 button { font-family: inherit; }
 #stage { position: absolute; width: 1586px; height: 992px; transform-origin: top left; }
 #strip { position: absolute; top: 0; left: 0; width: 1586px; height: 992px; overflow: hidden; }
-.screenpage { position: absolute; top: 0; left: 0; will-change: transform; width: 1586px; height: 992px; flex: none; box-sizing: border-box; background: #08080A; color: #EFEAE0; overflow: hidden; }
+.screenpage { position: absolute; top: 0; left: 0; will-change: transform; width: 1586px; height: 992px; flex: none; box-sizing: border-box; background: #08080A url(/tablet-assets/table-bg.jpg) center / 100% 100% no-repeat; color: #EFEAE0; overflow: hidden; }
 .overlaySheet { position: absolute; top: 0; left: 0; width: 1586px; height: 992px; z-index: 30; display: none; align-items: center; justify-content: center; background: rgba(8,8,10,0.9); }
 .overlaySheet.open { display: flex; }
 .menuCard { width: 460px; background: #0A0A0C; border: 1px solid #6A552A; border-radius: 14px; padding: 34px 30px; display: flex; flex-direction: column; gap: 14px; }
@@ -142,7 +142,7 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
 
     <!-- SCREEN 1: TABLE -->
     <div class="screenpage" id="pgTable">
-    <div class="seat" data-cell="0" style="position: absolute; left: 20px; top: 494px; width: 766px; height: 478px; overflow: hidden; background: #0A0A0C; -webkit-mask-image: radial-gradient(circle at 779px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at 779px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
+    <div class="seat" data-cell="0" style="position: absolute; left: 20px; top: 494px; width: 766px; height: 478px; overflow: hidden; background: rgba(10,10,12,0.45); -webkit-mask-image: radial-gradient(circle at 779px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at 779px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
 
       <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
         <div class="seatArt" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9);"></div>
@@ -180,7 +180,7 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
         </div>
       </div>
     </div>
-    <div class="seat" data-cell="1" style="position: absolute; left: 804px; top: 494px; width: 762px; height: 478px; overflow: hidden; background: #0A0A0C; -webkit-mask-image: radial-gradient(circle at -5px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at -5px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
+    <div class="seat" data-cell="1" style="position: absolute; left: 804px; top: 494px; width: 762px; height: 478px; overflow: hidden; background: rgba(10,10,12,0.45); -webkit-mask-image: radial-gradient(circle at -5px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at -5px -11px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
 
       <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
         <div class="seatArt" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9);"></div>
@@ -218,7 +218,7 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
         </div>
       </div>
     </div>
-    <div class="seat" data-cell="2" style="position: absolute; left: 804px; top: 20px; width: 762px; height: 457px; overflow: hidden; background: #0A0A0C; -webkit-mask-image: radial-gradient(circle at -5px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at -5px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
+    <div class="seat" data-cell="2" style="position: absolute; left: 804px; top: 20px; width: 762px; height: 457px; overflow: hidden; background: rgba(10,10,12,0.45); -webkit-mask-image: radial-gradient(circle at -5px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at -5px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
 
       <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: rotate(180deg);">
         <div class="seatArt" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9);"></div>
@@ -256,7 +256,7 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
         </div>
       </div>
     </div>
-    <div class="seat" data-cell="3" style="position: absolute; left: 20px; top: 20px; width: 766px; height: 457px; overflow: hidden; background: #0A0A0C; -webkit-mask-image: radial-gradient(circle at 779px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at 779px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
+    <div class="seat" data-cell="3" style="position: absolute; left: 20px; top: 20px; width: 766px; height: 457px; overflow: hidden; background: rgba(10,10,12,0.45); -webkit-mask-image: radial-gradient(circle at 779px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px); mask-image: radial-gradient(circle at 779px 463px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px);">
 
       <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: rotate(180deg);">
         <div class="seatArt" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9);"></div>
@@ -294,8 +294,6 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
         </div>
       </div>
     </div>
-
-      <div aria-hidden="true" style="position: absolute; left: 799px; top: 483px; width: 332px; height: 332px; margin: -166px 0 0 -166px; border-radius: 50%; background: #0A0A0C;"></div>
 
       <img src="/tablet-assets/table-frame-overlay.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 6; pointer-events: none;">
 
@@ -320,7 +318,7 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
     </div>
 
     <!-- SCREEN 2: FLOATING MANA -->
-    <div class="screenpage" id="pgMana" style="background: #0A0A0C;">
+    <div class="screenpage" id="pgMana">
       <img src="/tablet-assets/ornate-border.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 4; pointer-events: none;">
       <div style="position: absolute; top: 74px; right: 0; left: 0; text-align: center;">
         <div style="font-size: 27px; font-weight: 700; letter-spacing: 0.22em; color: #F3EEE3;">FLOATING MANA</div>
@@ -381,7 +379,7 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
     </div>
 
     <!-- SCREEN 3: TOKENS -->
-    <div class="screenpage" id="pgTokens" style="background: #0A0A0C;">
+    <div class="screenpage" id="pgTokens">
       <img src="/tablet-assets/ornate-border.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 4; pointer-events: none;">
       <div style="position: absolute; top: 62px; right: 0; left: 0; text-align: center;">
         <div style="font-size: 27px; font-weight: 700; letter-spacing: 0.22em; color: #F3EEE3;">TOKENS</div>
@@ -391,7 +389,7 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
     </div>
 
     <!-- SCREEN 4: COMMANDERS -->
-    <div class="screenpage" id="pgCmdrs" style="background: #0A0A0C;">
+    <div class="screenpage" id="pgCmdrs">
       <img src="/tablet-assets/ornate-border.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 4; pointer-events: none;">
       <div style="position: absolute; top: 62px; right: 0; left: 0; text-align: center;">
         <div style="font-size: 27px; font-weight: 700; letter-spacing: 0.22em; color: #F3EEE3;">COMMANDERS</div>

@@ -88,17 +88,42 @@
     dragX = 0;
   });
 
-  // seat rotation lives on this device (OK / Enter on the remote rotates, or ?seat=N)
+  // seat rotation lives on this device (Up/Down on the remote rotates, or ?seat=N)
   let seatOffset = parseInt((Q.match(/[?&]seat=(\d+)/) || [])[1] || store.getItem('tv2SeatOffset') || '0', 10);
+  function rotateSeats(dir) {
+    const n = Math.max(game.turnOrder.length, 1);
+    seatOffset = (seatOffset + dir + n) % n;
+    store.setItem('tv2SeatOffset', String(seatOffset));
+    render();
+  }
+
+  // QR join screen: JOIN button, OK on the remote, or Q. Shown automatically when nobody has joined.
+  let qrManual = false;
+  const noPlayers = () => false;
+  const qrOpen = () => $('joinOv').classList.contains('open');
+  function showQr(open) {
+    qrManual = open;
+    $('joinOv').classList.toggle('open', open);
+    if (open && page !== 0) { place(0.001, false); page = 0; place(0, false); }
+  }
+  $('qrBtn').addEventListener('click', (e) => { e.stopPropagation(); showQr(true); });
+  $('joinOv').addEventListener('click', () => { if (!noPlayers()) showQr(false); });
+
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowRight') go(1);
-    else if (e.key === 'ArrowLeft') go(-1);
-    else if (e.key === 'Enter' || e.key === ' ') {
-      seatOffset = (seatOffset + 1) % Math.max(game.turnOrder.length, 1);
-      store.setItem('tv2SeatOffset', String(seatOffset));
-      render();
-    }
+    const k = e.key;
+    if (qrOpen() && !noPlayers() && ['Enter', ' ', 'Escape', 'Backspace', 'GoBack', 'BrowserBack', 'q', 'Q'].includes(k)) { e.preventDefault(); showQr(false); return; }
+    if (k === 'ArrowRight') go(1);
+    else if (k === 'ArrowLeft') go(-1);
+    else if (k === 'ArrowUp') rotateSeats(1);
+    else if (k === 'ArrowDown') rotateSeats(-1);
+    else if (k === 'Enter' || k === ' ' || k === 'q' || k === 'Q') { e.preventDefault(); showQr(true); }
   });
+
+  // hide the mouse pointer when it's idle
+  let curT;
+  const wake = () => { document.body.classList.remove('hideCursor'); clearTimeout(curT); curT = setTimeout(() => document.body.classList.add('hideCursor'), 2500); };
+  document.addEventListener('mousemove', wake);
+  wake();
   window.__tv2Page = () => page;
 
   // ---------- connection (display only: no PIN, no actions) ----------
@@ -141,7 +166,7 @@
 
   function render() {
     const cells = cellPlayers();
-    $('joinOv').classList.toggle('open', game.turnOrder.length === 0);
+    $('joinOv').classList.toggle('open', qrManual);
     const act = activeId();
     activeCell = -1;
     seatEls.forEach((el, cell) => {
@@ -158,10 +183,30 @@
       if (id && p) lastLife[id] = p.life;
       const artUrl = p && p.commander && (p.commander.art || p.commander.image);
       el.querySelector('.seatArt').style.backgroundImage = artUrl ? cssUrl(artUrl) : 'none';
-      el.style.opacity = p ? '1' : '0.55';
+      el.style.opacity = '1';
+      el.classList.toggle('empty', !p);
+      if (!p) {
+        const sq = el.querySelector('.seatJoin .sq');
+        if (sq && !sq.dataset.done) {
+          sq.dataset.done = '1';
+          try { if (window.QRCode) new QRCode(sq, { text: location.origin, width: 150, height: 150 }); } catch {}
+        }
+      }
       const isActive = !!id && id === act;
       el.classList.toggle('active', isActive);
       if (isActive) activeCell = cell;
+      // commander damage received: small chips (attacker's commander art + amount), only non-zero
+      const cd = el.querySelector('.cmdDmg');
+      if (cd) {
+        const entries = p ? Object.entries(p.cmdDamage || {}).filter(([fid, v]) => v > 0 && game.players[fid]) : [];
+        const html = entries.map(([fid, v]) => {
+          const o = game.players[fid];
+          const art = o.commander && (o.commander.art || o.commander.image);
+          const cls = v >= 21 ? ' lethal' : v >= 15 ? ' warn' : '';
+          return `<div class="cdChip${cls}" title="${esc(o.name)}"><i${art ? ` style='background-image: ${cssUrl(art).replace(/'/g, '%27')}'` : ''}></i><b>${v}</b></div>`;
+        }).join('');
+        if (cd.dataset.h !== html) { cd.dataset.h = html; cd.innerHTML = html; }
+      }
       const dead = !!p && (p.life <= 0 || Object.values(p.cmdDamage || {}).some((d) => d >= 21));
       el.classList.toggle('dead', dead);
     });
