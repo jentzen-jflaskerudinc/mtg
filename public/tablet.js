@@ -4,13 +4,22 @@
 
   // ---------- fixed-canvas scaling (brief section 2) ----------
   const stage = $('stage');
+  // default: fill the tablet edge-to-edge (independent x/y scale, whole canvas stretches together
+  // so the frame art stays aligned). ?fit=contain restores exact-proportion letterboxing.
+  const FIT_CONTAIN = /[?&]fit=contain\b/.test(location.search);
   function rescale() {
-    const s = Math.min(innerWidth / 1586, innerHeight / 992);
-    stage.style.transform = `scale(${s})`;
-    stage.style.left = `${(innerWidth - 1586 * s) / 2}px`;
-    stage.style.top = `${(innerHeight - 992 * s) / 2}px`;
+    const vw = (window.visualViewport && window.visualViewport.width) || innerWidth;
+    const vh = (window.visualViewport && window.visualViewport.height) || innerHeight;
+    let sx = vw / 1586, sy = vh / 992;
+    if (FIT_CONTAIN) sx = sy = Math.min(sx, sy);
+    stage.style.transform = `scale(${sx}, ${sy})`;
+    stage.style.left = `${(vw - 1586 * sx) / 2}px`;
+    stage.style.top = `${(vh - 992 * sy) / 2}px`;
   }
   addEventListener('resize', rescale);
+  addEventListener('orientationchange', () => setTimeout(rescale, 250));
+  document.addEventListener('fullscreenchange', () => setTimeout(rescale, 100));
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', rescale);
   rescale();
 
   // ---------- three screens, circular swipe ----------
@@ -102,6 +111,7 @@
 
   const fmt = (s) => `${Math.floor(Math.max(s, 0) / 60)}:${String(Math.max(s, 0) % 60).padStart(2, '0')}`;
   const activeId = () => game.turnOrder[game.activeIdx];
+  const cssUrl = (u) => `url("${String(u).replace(/'/g, '%27').replace(/["\\\n]/g, (c) => '\\' + c)}")`;
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // cell order 0=BL 1=BR 2=TR 3=TL, turn order counter-clockwise from bottom-left
@@ -126,6 +136,7 @@
       holdT = setTimeout(() => { repT = setInterval(fn, 150); }, 480);
     });
     ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, stop));
+    ['pointerup', 'pointercancel'].forEach((ev) => document.addEventListener(ev, stop));
   }
 
   seatEls.forEach((el, cell) => {
@@ -134,7 +145,7 @@
     holdable(el.querySelector('.p1'), () => { const id = pid(); if (id) mAct('life', { targetId: id, delta: 1 }); });
     el.querySelector('.m5').addEventListener('click', () => { const id = pid(); if (id) mAct('life', { targetId: id, delta: -5 }); });
     el.querySelector('.p5').addEventListener('click', () => { const id = pid(); if (id) mAct('life', { targetId: id, delta: 5 }); });
-    el.querySelector('.cmdBtn').addEventListener('click', () => { if (pid()) { openCmdCell = cell; render(); } });
+    el.querySelector('.cmdBtn').addEventListener('click', () => { if (pid()) { openCmdCell = cell; render(); $('cmdSheet').classList.add('open'); } });
     el.querySelector('.cmdDone').addEventListener('click', () => { openCmdCell = null; render(); });
 
     // player name commit
@@ -187,35 +198,61 @@
       setInput(el.querySelector('.pName'), p ? p.name : '');
       el.querySelector('.lifeVal').textContent = p ? p.life : '';
       const artUrl = p && p.commander && (p.commander.art || p.commander.image);
-      el.querySelector('.seatArt').style.backgroundImage = artUrl ? `url('${artUrl}')` : 'none';
+      el.querySelector('.seatArt').style.backgroundImage = artUrl ? cssUrl(artUrl) : 'none';
       el.style.opacity = p ? '1' : '0.55';
 
-      const ov = el.querySelector('.cmdOv');
-      if (openCmdCell === cell && p) {
-        ov.style.display = 'flex';
-        const rows = el.querySelector('.cmdRows');
-        rows.innerHTML = '';
-        game.turnOrder.filter((oid) => oid !== id).forEach((oid) => {
-          const o = game.players[oid];
-          if (!o) return;
-          const d = (p.cmdDamage && p.cmdDamage[oid]) || 0;
-          const row = document.createElement('div');
-          row.className = 'rowline';
-          row.innerHTML = `<span class="nm">${esc(o.name)}</span>` +
-            `<button type="button" class="dm">&minus;</button>` +
-            `<b class="${d >= 21 ? 'lethal' : ''}">${d}</b>` +
-            `<button type="button" class="dp">+</button>`;
-          row.querySelector('.dm').addEventListener('click', () => mAct('cmdDamage', { targetId: id, fromId: oid, delta: -1 }));
-          row.querySelector('.dp').addEventListener('click', () => mAct('cmdDamage', { targetId: id, fromId: oid, delta: 1 }));
-          rows.appendChild(row);
-        });
-      } else {
-        ov.style.display = 'none';
-      }
+      el.querySelector('.cmdOv').style.display = 'none';
     });
 
     const act = game.players[activeId()];
     renderTurnLabel(act);
+    renderCmdWindow();
+  }
+
+  // ---------- commander damage window ----------
+  function closeCmd() { openCmdCell = null; $('cmdSheet').classList.remove('open'); $('cmdList').dataset.key = ''; }
+  $('cmdDoneBtn').addEventListener('click', closeCmd);
+  $('cmdSheet').addEventListener('click', (e) => { if (e.target.id === 'cmdSheet') closeCmd(); });
+
+  function renderCmdWindow() {
+    if (openCmdCell === null) return;
+    const id = cellPlayers()[openCmdCell];
+    const p = id ? game.players[id] : null;
+    if (!p) { closeCmd(); return; }
+    $('cmdCard').classList.toggle('flip', openCmdCell >= 2); // top seats read it from across the table
+    $('cmdTitle').textContent = `COMMANDER DAMAGE \u2014 ${p.name.toUpperCase()}`;
+    const list = $('cmdList');
+    const opps = game.turnOrder.filter((oid) => oid !== id && game.players[oid]);
+    const key = `${openCmdCell}|${id}|${opps.join(',')}`;
+    if (list.dataset.key !== key) {
+      list.dataset.key = key;
+      list.innerHTML = '';
+      opps.forEach((oid) => {
+        const o = game.players[oid];
+        const art = o.commander && (o.commander.art || o.commander.image);
+        const row = document.createElement('div');
+        row.className = 'cdRow2';
+        row.dataset.from = oid;
+        row.innerHTML =
+          `<div class="thumb"></div>` +
+          `<div class="who"><div class="pl">${esc(o.name)}</div><div class="cm">${esc(o.commander ? o.commander.name : '')}</div></div>` +
+          `<button type="button" class="dm" aria-label="Remove one damage">&minus;</button>` +
+          `<b>0</b>` +
+          `<button type="button" class="dp" aria-label="Add one damage">+</button>`;
+        if (art) row.querySelector('.thumb').style.backgroundImage = cssUrl(art);
+        holdable(row.querySelector('.dm'), () => mAct('cmdDamage', { targetId: id, fromId: oid, delta: -1 }));
+        holdable(row.querySelector('.dp'), () => mAct('cmdDamage', { targetId: id, fromId: oid, delta: 1 }));
+        list.appendChild(row);
+      });
+    }
+    list.querySelectorAll('.cdRow2').forEach((row) => {
+      const d = (p.cmdDamage && p.cmdDamage[row.dataset.from]) || 0;
+      const b = row.querySelector('b');
+      b.textContent = d;
+      b.classList.toggle('lethal', d >= 21);
+      row.classList.toggle('lethal', d >= 21);
+    });
+    if (!list.children.length) list.innerHTML = '<div style="text-align:center;color:#5E574B;font-size:13px;letter-spacing:0.14em;">NO OPPONENTS YET</div>';
   }
 
   function renderTurnLabel(act) {
