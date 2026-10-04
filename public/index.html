@@ -55,11 +55,11 @@
   #cmdPreview img { width: 65%; border-radius: 12px; }
   #cmdPreview p { margin-top: 6px; color: var(--gold); font-size: 15px; }
   .seatHint { font-size: 12px; color: var(--muted); margin: -2px 0 8px; line-height: 1.35; }
-  #seatPick { position: relative; display: grid; grid-template-columns: 0.8fr 1fr 1fr; gap: 8px; padding: 8px; border-radius: 14px; background: var(--panel); border: 1px solid #2c3240; }
+  #seatPick { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 8px; border-radius: 14px; background: var(--panel); border: 1px solid #2c3240; }
   #seatPick button { height: 58px; border-radius: 10px; border: 1px solid #2c3240; background: var(--panel2); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 8px; }
   #seatPick button.on { border-color: var(--gold); background: rgba(212,175,55,0.18); color: var(--gold); }
   #seatPick button:disabled { opacity: .45; font-weight: 400; }
-  #seatPick .tab { position: absolute; left: 63%; top: 50%; transform: translate(-50%, -50%); padding: 5px 10px; border-radius: 8px; background: #0c0e13; border: 1px solid var(--gold); color: var(--gold); font-size: 10px; letter-spacing: 1px; pointer-events: none; }
+  #seatPick .tab { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 5px 10px; border-radius: 8px; background: #0c0e13; border: 1px solid var(--gold); color: var(--gold); font-size: 10px; letter-spacing: 1px; pointer-events: none; }
   .gearBar { text-align: center; margin-top: 26px; }
   .gearBar button { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px; }
 
@@ -221,13 +221,13 @@
   <div id="results"></div>
   <div id="cmdPreview"><img id="cmdImg" alt=""><p id="cmdName"></p></div>
   <label>Where are you sitting?</label>
-  <div class="seatHint">"Bottom" is the side of the table where the tablet's END TURN reads right side up. "Left end" is for a 5th player.</div>
+  <div class="seatHint">"Bottom" is the side of the table where the tablet's END TURN reads right side up. "Bottom middle" is for a 5th player.</div>
   <div id="seatPick">
-    <button type="button" data-seat="4" style="grid-row: span 2; height: auto; white-space: normal;">Left end</button>
-    <button type="button" data-seat="3">Top left</button>
-    <button type="button" data-seat="2">Top right</button>
-    <button type="button" data-seat="0">Bottom left</button>
-    <button type="button" data-seat="1">Bottom right</button>
+    <button type="button" data-seat="3" style="grid-column: span 3;">Top left</button>
+    <button type="button" data-seat="2" style="grid-column: span 3;">Top right</button>
+    <button type="button" data-seat="0" style="grid-column: span 2;">Bottom left</button>
+    <button type="button" data-seat="4" style="grid-column: span 2;">Bottom middle</button>
+    <button type="button" data-seat="1" style="grid-column: span 2;">Bottom right</button>
     <div class="tab">TABLET</div>
   </div>
   <button class="btn" id="joinBtn" disabled>Join Game</button>
@@ -483,7 +483,7 @@
 
   // seat picker (optional: if skipped, the server gives the first free seat)
   let chosenSeat = null;
-  const SEAT_NAMES = ['Bottom left', 'Bottom right', 'Top right', 'Top left', 'Left end'];
+  const SEAT_NAMES = ['Bottom left', 'Bottom right', 'Top right', 'Top left', 'Bottom middle'];
   document.querySelectorAll('#seatPick button').forEach((b) => b.addEventListener('click', () => {
     chosenSeat = Number(b.dataset.seat);
     renderSeatPick();

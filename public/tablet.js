@@ -158,9 +158,9 @@
   const cssUrl = (u) => `url("${String(u).replace(/'/g, '%27').replace(/["\\\n]/g, (c) => '\\' + c)}")`;
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  // cell order 0=BL 1=BR 2=TR 3=TL 4=left end. Each player sits in the cell matching their seat
+  // cell order 0=BL 1=BR 2=TR 3=TL 4=bottom-middle. Each player sits in the cell matching their seat
   // (chosen on the phone or moved on the tablet); anyone without a seat fills the gaps.
-  // The left-end seat (5-player layout) appears when a 5th player joins or someone takes that seat.
+  // The 5-player layout (2 on top, 3 along the bottom) turns on when a 5th player joins or someone takes the middle seat.
   function isFive() {
     const ids = game.turnOrder.filter((id) => game.players[id]);
     return ids.length >= 5 || ids.some((id) => game.players[id].seat === 4);
@@ -178,10 +178,10 @@
     for (let c = 0; c < n && loose.length; c++) if (!cells[c]) cells[c] = loose.shift();
     return cells;
   }
-  // 4-seat and 5-seat geometry (5-seat: four boxes shift right/narrow, ring centre moves to x=949)
+  // 4-seat and 5-seat geometry (5-seat: bottom row splits into three; the middle one has the ring notch)
   const LAYOUTS = {
     4: { cx: 799, frame: 'table-frame-overlay.png', cells: [[20, 494, 766, 478], [804, 494, 762, 478], [804, 20, 762, 457], [20, 20, 766, 457]] },
-    5: { cx: 949, frame: 'table-frame-overlay-5.png', cells: [[320, 494, 616, 478], [954, 494, 612, 478], [954, 20, 612, 457], [320, 20, 616, 457]] },
+    5: { cx: 799, frame: 'table-frame-overlay-5.png', cells: [[20, 494, 503, 478], [1063, 494, 503, 478], [804, 20, 762, 457], [20, 20, 766, 457]] },
   };
   let layoutNow = null;
   function applyLayout(five) {
@@ -201,8 +201,11 @@
     if (hub) hub.style.left = L.cx + 'px';
     const fr = document.getElementById('frameOv');
     if (fr) fr.src = fr.src.replace(/table-frame-overlay(-5)?\.png/, L.frame);
+    const pg = document.getElementById('pgTable'); if (pg) pg.classList.toggle('five', five);
     window.__layout = key;
   }
+  // tag the player-name wrappers so the 5-seat layout can lay them flat in the narrower bottom boxes
+  document.querySelectorAll('#pgTable .seat .pName').forEach((n) => n.parentElement.classList.add('pnWrap'));
 
   // ---------- table screen wiring ----------
   const seatEls = Array.from(document.querySelectorAll('.seat'));
@@ -267,7 +270,7 @@
   seatEls.forEach((el, cell) => {
     const ov = document.createElement('div');
     ov.className = 'moveOv';
-    ov.innerHTML = `<span${cell === 4 ? ' style="transform: rotate(90deg);"' : cell >= 2 ? ' style="transform: rotate(180deg);"' : ''}></span>`;
+    ov.innerHTML = `<span${cell === 2 || cell === 3 ? ' style="transform: rotate(180deg);"' : ''}></span>`;
     el.appendChild(ov);
     el.addEventListener('pointerdown', (e) => {
       if (moveFrom !== null || (e.target.closest && e.target.closest('button, input'))) return;
