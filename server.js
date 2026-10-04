@@ -172,6 +172,41 @@ function removePlayer(targetId) {
   return true;
 }
 
+// ---------- Seats: where each player physically sits around the tablet ----------
+// 0 = bottom-left, 1 = bottom-right, 2 = top-right, 3 = top-left, 4 = left end (same cells as the tablet/TV layout).
+// Turn order follows the seats around the table.
+const SEATS = 5;
+function freeSeat() {
+  const taken = new Set(Object.values(state.players).map((p) => p.seat));
+  for (let s = 0; s < SEATS; s++) if (!taken.has(s)) return s;
+  return null;
+}
+function orderBySeats() {
+  const activeId = state.turnOrder[state.activeIdx];
+  const seated = state.turnOrder.filter((id) => state.players[id] && Number.isInteger(state.players[id].seat));
+  const unseated = state.turnOrder.filter((id) => !seated.includes(id));
+  seated.sort((a, b) => state.players[a].seat - state.players[b].seat);
+  state.turnOrder = [...seated, ...unseated];
+  const i = state.turnOrder.indexOf(activeId);
+  state.activeIdx = i === -1 ? 0 : i;
+}
+function setSeat(targetId, seat) {
+  const p = state.players[targetId];
+  seat = Number(seat);
+  if (!p || !Number.isInteger(seat) || seat < 0 || seat >= SEATS) return false;
+  const other = Object.values(state.players).find((q) => q.id !== targetId && q.seat === seat);
+  if (other) other.seat = Number.isInteger(p.seat) ? p.seat : freeSeatExcept(seat);
+  p.seat = seat;
+  orderBySeats();
+  return true;
+}
+function freeSeatExcept(seat) {
+  const taken = new Set(Object.values(state.players).map((q) => q.seat));
+  taken.add(seat);
+  for (let s = 0; s < SEATS; s++) if (!taken.has(s)) return s;
+  return null;
+}
+
 // ---------- Master actions (PIN-gated) ----------
 function handleMaster(ws, msg) {
   if (msg.pin !== MASTER_PIN) {
@@ -215,6 +250,9 @@ function handleMaster(ws, msg) {
     }
     case 'removePlayer':
       removePlayer(msg.targetId);
+      break;
+    case 'setSeat':
+      setSeat(msg.targetId, msg.seat);
       break;
     case 'rename': {
       const p = state.players[msg.targetId];
@@ -302,8 +340,14 @@ wss.on('connection', (ws) => {
             life: STARTING_LIFE,
             cmdDamage: {},
             connected: true,
+            seat: null,
           };
+          const want = Number(msg.seat);
+          const wantFree = Number.isInteger(want) && want >= 0 && want < SEATS &&
+            !Object.values(state.players).some((q) => q.id !== id && q.seat === want);
+          state.players[id].seat = wantFree ? want : freeSeat();
           state.turnOrder.push(id);
+          orderBySeats();
         }
         const p = state.players[id];
         p.name = name;
