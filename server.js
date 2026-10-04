@@ -173,9 +173,11 @@ function removePlayer(targetId) {
 }
 
 // ---------- Seats: where each player physically sits around the tablet ----------
-// 0 = bottom-left, 1 = bottom-right, 2 = top-right, 3 = top-left, 4 = left end (same cells as the tablet/TV layout).
+// 0 = bottom-left, 1 = bottom-right, 2 = top-right, 3 = top-left, 4 = bottom-middle (5-player layout).
+// Same cells as the tablet/TV layout. Turn order goes around the table: BL, (BM), BR, TR, TL.
 // Turn order follows the seats around the table.
 const SEATS = 5;
+const SEAT_RANK = { 0: 0, 4: 1, 1: 2, 2: 3, 3: 4 };
 function freeSeat() {
   const taken = new Set(Object.values(state.players).map((p) => p.seat));
   for (let s = 0; s < SEATS; s++) if (!taken.has(s)) return s;
@@ -185,7 +187,7 @@ function orderBySeats() {
   const activeId = state.turnOrder[state.activeIdx];
   const seated = state.turnOrder.filter((id) => state.players[id] && Number.isInteger(state.players[id].seat));
   const unseated = state.turnOrder.filter((id) => !seated.includes(id));
-  seated.sort((a, b) => state.players[a].seat - state.players[b].seat);
+  seated.sort((a, b) => SEAT_RANK[state.players[a].seat] - SEAT_RANK[state.players[b].seat]);
   state.turnOrder = [...seated, ...unseated];
   const i = state.turnOrder.indexOf(activeId);
   state.activeIdx = i === -1 ? 0 : i;
