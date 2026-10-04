@@ -133,6 +133,24 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
 .ctrGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .ctrPick { height: 54px; border: 1px solid #3A352A; border-radius: 8px; background: #14131A; color: #E7DFCE; font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; cursor: pointer; }
 .ctrPick:active { background: #6A552A; }
+
+.moveOv { display: none; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 8; align-items: center; justify-content: center; pointer-events: none; }
+.seat.moveSrc .moveOv, .seat.moveDst .moveOv { display: flex; }
+.seat.moveSrc .moveOv { background: rgba(8,8,10,0.6); box-shadow: inset 0 0 0 5px #C9A227; }
+.seat.moveDst .moveOv { background: rgba(201,162,39,0.12); outline: 3px dashed #C9A227; outline-offset: -14px; }
+.moveOv span { display: inline-block; padding: 12px 24px; border-radius: 26px; background: rgba(8,8,10,0.88); border: 1px solid #C9A227; color: #F3EEE3; font-size: 20px; font-weight: 700; letter-spacing: 0.14em; }
+.pName::placeholder { color: #7C7466; }
+#endTurn { border-radius: 50%; }
+#endTurn img { position: absolute; left: 50%; top: 50%; width: 262px !important; height: 75px !important; margin: -37px 0 0 -131px; }
+#turnLabel { pointer-events: none; z-index: 2; }
+.cmdDmg { position: absolute; left: 180px; right: 210px; bottom: calc(50% + 94px); display: flex; flex-wrap: wrap-reverse; justify-content: center; gap: 6px 8px; pointer-events: none; }
+.seat[data-cell="1"] .cmdDmg, .seat[data-cell="3"] .cmdDmg { left: 210px; right: 180px; }
+.cdChip { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px 0 3px; border-radius: 16px; background: rgba(8,8,10,0.8); border: 1px solid rgba(106,85,42,0.9); }
+.cdChip i { width: 26px; height: 26px; border-radius: 50%; background: #2a2620 center / cover no-repeat; border: 1px solid #6A552A; flex: none; }
+.cdChip em { font-style: normal; max-width: 74px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: #CFC4AE; }
+.cdChip b { font-family: 'Peteroy', Georgia, serif; font-weight: 400; font-size: 23px; line-height: 1; color: #F3EEE3; }
+.cdChip.warn { border-color: #C9A227; } .cdChip.warn b { color: #E8C96A; }
+.cdChip.lethal { border-color: #DC5A42; background: rgba(60,12,6,0.8); } .cdChip.lethal b { color: #F08A74; }
 </style>
 </head>
 <body>
@@ -155,11 +173,12 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
           <input type="text" class="cmdB" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 400px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
         </div>
 
-        <div style="position: absolute; top: 138px; right: 77px; width: 150px; transform: rotate(45deg); transform-origin: center; display: flex; justify-content: center;">
-          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 150px; height: 28px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #A79C86; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        <div style="position: absolute; top: 132px; right: 56px; width: 192px; transform: rotate(45deg); transform-origin: center; display: flex; justify-content: center;">
+          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 192px; height: 40px; box-sizing: border-box; padding: 0 12px; text-align: center; border: 1px solid rgba(201,162,39,0.6); border-radius: 20px; background: rgba(8,8,10,0.78); color: #F9F5EC; font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
         </div>
 
         <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+          <div class="cmdDmg"></div>
           <div style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
             <span class="lifeVal" style="font-family: 'Peteroy', Georgia, serif; font-size: 138px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; letter-spacing: 0.01em; text-shadow: 0 4px 22px rgba(8,8,10,0.95), 0 0 46px rgba(8,8,10,0.7);"></span>
           </div>
@@ -193,11 +212,12 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
           <input type="text" class="cmdB" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 400px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
         </div>
 
-        <div style="position: absolute; top: 138px; left: 77px; width: 150px; transform: rotate(-45deg); transform-origin: center; display: flex; justify-content: center;">
-          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 150px; height: 28px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #A79C86; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        <div style="position: absolute; top: 132px; left: 56px; width: 192px; transform: rotate(-45deg); transform-origin: center; display: flex; justify-content: center;">
+          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 192px; height: 40px; box-sizing: border-box; padding: 0 12px; text-align: center; border: 1px solid rgba(201,162,39,0.6); border-radius: 20px; background: rgba(8,8,10,0.78); color: #F9F5EC; font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
         </div>
 
         <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+          <div class="cmdDmg"></div>
           <div style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
             <span class="lifeVal" style="font-family: 'Peteroy', Georgia, serif; font-size: 138px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; letter-spacing: 0.01em; text-shadow: 0 4px 22px rgba(8,8,10,0.95), 0 0 46px rgba(8,8,10,0.7);"></span>
           </div>
@@ -231,11 +251,12 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
           <input type="text" class="cmdB" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 400px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
         </div>
 
-        <div style="position: absolute; top: 138px; right: 77px; width: 150px; transform: rotate(45deg); transform-origin: center; display: flex; justify-content: center;">
-          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 150px; height: 28px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #A79C86; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        <div style="position: absolute; top: 132px; right: 56px; width: 192px; transform: rotate(45deg); transform-origin: center; display: flex; justify-content: center;">
+          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 192px; height: 40px; box-sizing: border-box; padding: 0 12px; text-align: center; border: 1px solid rgba(201,162,39,0.6); border-radius: 20px; background: rgba(8,8,10,0.78); color: #F9F5EC; font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
         </div>
 
         <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+          <div class="cmdDmg"></div>
           <div style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
             <span class="lifeVal" style="font-family: 'Peteroy', Georgia, serif; font-size: 138px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; letter-spacing: 0.01em; text-shadow: 0 4px 22px rgba(8,8,10,0.95), 0 0 46px rgba(8,8,10,0.7);"></span>
           </div>
@@ -269,11 +290,12 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
           <input type="text" class="cmdB" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 400px; height: 40px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
         </div>
 
-        <div style="position: absolute; top: 138px; left: 77px; width: 150px; transform: rotate(-45deg); transform-origin: center; display: flex; justify-content: center;">
-          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 150px; height: 28px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #A79C86; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        <div style="position: absolute; top: 132px; left: 56px; width: 192px; transform: rotate(-45deg); transform-origin: center; display: flex; justify-content: center;">
+          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 192px; height: 40px; box-sizing: border-box; padding: 0 12px; text-align: center; border: 1px solid rgba(201,162,39,0.6); border-radius: 20px; background: rgba(8,8,10,0.78); color: #F9F5EC; font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
         </div>
 
         <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+          <div class="cmdDmg"></div>
           <div style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
             <span class="lifeVal" style="font-family: 'Peteroy', Georgia, serif; font-size: 138px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; letter-spacing: 0.01em; text-shadow: 0 4px 22px rgba(8,8,10,0.95), 0 0 46px rgba(8,8,10,0.7);"></span>
           </div>
@@ -295,12 +317,37 @@ textarea.cField { height: 90px; padding: 10px 14px; resize: none; font-family: G
       </div>
     </div>
 
-      <img src="/tablet-assets/table-frame-overlay.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 6; pointer-events: none;">
+    <div class="seat" data-cell="4" style="display: none; position: absolute; left: 20px; top: 20px; width: 260px; height: 952px; overflow: hidden; background: rgba(10,10,12,0.45);">
+      <div style="position: absolute; left: 50%; top: 50%; width: 952px; height: 260px; margin: -130px 0 0 -476px; transform: rotate(90deg);">
+        <div class="seatArt" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 30%; filter: saturate(0.95) brightness(0.9);"></div>
+        <div aria-hidden="true" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(180deg, rgba(8,8,10,0.66) 0%, rgba(8,8,10,0.30) 32%, rgba(8,8,10,0.30) 68%, rgba(8,8,10,0.66) 100%), radial-gradient(ellipse at center, rgba(8,8,10,0.18) 40%, rgba(8,8,10,0.60) 100%);"></div>
+        <div style="position: absolute; top: 8px; left: 0; right: 0; display: flex; justify-content: center;">
+          <input type="text" class="cmdA" aria-label="Commander name" placeholder="Commander Name" value="" style="width: 440px; height: 38px; box-sizing: border-box; padding: 0; text-align: center; border: none; background: transparent; color: #F3EEE3; font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+        <input type="text" class="cmdB" aria-hidden="true" tabindex="-1" style="display: none;">
+        <div style="position: absolute; left: 26px; bottom: 12px;">
+          <input type="text" class="pName" aria-label="Player name" placeholder="Player Name" value="" style="width: 192px; height: 40px; box-sizing: border-box; padding: 0 12px; text-align: center; border: 1px solid rgba(201,162,39,0.6); border-radius: 20px; background: rgba(8,8,10,0.78); color: #F9F5EC; font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-shadow: 0 2px 10px rgba(8,8,10,0.9);">
+        </div>
+        <div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0;">
+          <div class="cmdDmg" style="left: 240px; right: 240px; bottom: auto; top: auto; bottom: 10px;"></div>
+          <div style="position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
+            <span class="lifeVal" style="font-family: 'Peteroy', Georgia, serif; font-size: 124px; font-weight: 400; line-height: 1; display: inline-block; transform: scaleY(1.22); transform-origin: center; color: #F9F5EC; letter-spacing: 0.01em; text-shadow: 0 4px 22px rgba(8,8,10,0.95), 0 0 46px rgba(8,8,10,0.7);"></span>
+          </div>
+          <button type="button" class="m5" style="position: absolute; top: 50%; left: 70px; width: 84px; height: 60px; margin-top: -30px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">-5</button>
+          <button type="button" class="m1" aria-label="Lose one life" style="position: absolute; top: 50%; left: 230px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">&minus;</button>
+          <button type="button" class="p1" aria-label="Gain one life" style="position: absolute; top: 50%; right: 230px; width: 74px; height: 74px; margin-top: -37px; border: none; background: transparent; padding: 0; color: #E7DFCE; font-family: inherit; font-size: 50px; line-height: 1; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+</button>
+          <button type="button" class="p5" style="position: absolute; top: 50%; right: 70px; width: 84px; height: 60px; margin-top: -30px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">+5</button>
+          <button type="button" class="cmdBtn" style="position: absolute; right: 26px; bottom: 6px; width: 84px; height: 53px; padding: 0; box-sizing: border-box; border: none; background: transparent; color: #E7DFCE; font-family: inherit; font-size: 25px; font-weight: 600; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(8,8,10,0.9); cursor: pointer;">CMD</button>
+        </div>
+        <div class="cmdOv" style="display: none;"><button type="button" class="cmdDone" style="display: none;"></button></div>
+      </div>
+    </div>
+      <img id="frameOv" src="/tablet-assets/table-frame-overlay.png" alt="" aria-hidden="true" style="position: absolute; top: 0; left: 0; width: 1586px; height: 992px; display: block; z-index: 6; pointer-events: none;">
 
-      <div style="position: absolute; left: 799px; top: 483px; width: 300px; height: 0; margin-left: -150px; z-index: 12;">
-        <div id="turnLabel" style="position: absolute; left: 0; right: 0; bottom: 44px; text-align: center; font-size: 15px; font-weight: 700; letter-spacing: 0.11em; color: #F3EEE3;">PLAYER&#39;S TURN</div>
-        <div style="position: absolute; left: 0; right: 0; top: -32px; height: 63px; display: flex; justify-content: center;">
-          <button type="button" id="endTurn" style="width: 220px; height: 63px; padding: 0; border: none; background: transparent; cursor: pointer; display: block;"><img src="/tablet-assets/end-turn-button.png" alt="End turn" style="width: 220px; height: 63px; display: block; pointer-events: none;"></button>
+      <div id="hub" style="position: absolute; left: 799px; top: 483px; width: 300px; height: 0; margin-left: -150px; z-index: 12;">
+        <div id="turnLabel" style="position: absolute; left: 0; right: 0; bottom: 50px; text-align: center; font-size: 15px; font-weight: 700; letter-spacing: 0.11em; color: #F3EEE3;">PLAYER&#39;S TURN</div>
+        <div style="position: absolute; left: 0; right: 0; top: -145px; height: 290px; display: flex; justify-content: center;">
+          <button type="button" id="endTurn" aria-label="End turn" style="position: relative; width: 290px; height: 290px; padding: 0; border: none; background: transparent; cursor: pointer; display: block;"><img src="/tablet-assets/end-turn-button.png" alt="End turn" style="width: 220px; height: 63px; display: block; pointer-events: none;"></button>
         </div>
       </div>
 

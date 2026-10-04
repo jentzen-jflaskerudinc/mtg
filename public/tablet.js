@@ -99,7 +99,6 @@
   let game = { players: {}, turnOrder: [], activeIdx: 0, turnNumber: 1, timer: { votes: [], pendingSeconds: 0, running: false, endsAt: 0, duration: 300 } };
   let clockOffset = 0;
   let masterPin = store.getItem('masterPin') || null;
-  let seatOffset = parseInt(store.getItem('seatOffset') || '0', 10);
   let openCmdCell = null;
 
   const joinUrl = location.origin.replace(/^https?:\/\//, '');
@@ -159,13 +158,50 @@
   const cssUrl = (u) => `url("${String(u).replace(/'/g, '%27').replace(/["\\\n]/g, (c) => '\\' + c)}")`;
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  // cell order 0=BL 1=BR 2=TR 3=TL, turn order counter-clockwise from bottom-left
+  // cell order 0=BL 1=BR 2=TR 3=TL 4=left end. Each player sits in the cell matching their seat
+  // (chosen on the phone or moved on the tablet); anyone without a seat fills the gaps.
+  // The left-end seat (5-player layout) appears when a 5th player joins or someone takes that seat.
+  function isFive() {
+    const ids = game.turnOrder.filter((id) => game.players[id]);
+    return ids.length >= 5 || ids.some((id) => game.players[id].seat === 4);
+  }
   function cellPlayers() {
-    const ids = game.turnOrder;
-    const n = ids.length;
-    const cells = [null, null, null, null];
-    for (let i = 0; i < Math.min(n, 4); i++) cells[i] = ids[(i + seatOffset) % n];
+    const five = isFive();
+    const n = five ? 5 : 4;
+    const cells = [null, null, null, null, null];
+    const ids = game.turnOrder.filter((id) => game.players[id]);
+    const loose = [];
+    ids.forEach((id) => {
+      const s = game.players[id].seat;
+      if (Number.isInteger(s) && s >= 0 && s < n && !cells[s]) cells[s] = id; else loose.push(id);
+    });
+    for (let c = 0; c < n && loose.length; c++) if (!cells[c]) cells[c] = loose.shift();
     return cells;
+  }
+  // 4-seat and 5-seat geometry (5-seat: four boxes shift right/narrow, ring centre moves to x=949)
+  const LAYOUTS = {
+    4: { cx: 799, frame: 'table-frame-overlay.png', cells: [[20, 494, 766, 478], [804, 494, 762, 478], [804, 20, 762, 457], [20, 20, 766, 457]] },
+    5: { cx: 949, frame: 'table-frame-overlay-5.png', cells: [[320, 494, 616, 478], [954, 494, 612, 478], [954, 20, 612, 457], [320, 20, 616, 457]] },
+  };
+  let layoutNow = null;
+  function applyLayout(five) {
+    const key = five ? 5 : 4;
+    if (layoutNow === key) return;
+    layoutNow = key;
+    const L = LAYOUTS[key], CY = 483;
+    document.querySelectorAll('#pgTable .seat').forEach((el) => {
+      const c = Number(el.dataset.cell);
+      if (c === 4) { el.style.display = five ? 'block' : 'none'; return; }
+      const [x, y, w, h] = L.cells[c];
+      Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+      const m = `radial-gradient(circle at ${L.cx - x}px ${CY - y}px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px)`;
+      el.style.webkitMaskImage = m; el.style.maskImage = m;
+    });
+    const hub = document.getElementById('hub');
+    if (hub) hub.style.left = L.cx + 'px';
+    const fr = document.getElementById('frameOv');
+    if (fr) fr.src = fr.src.replace(/table-frame-overlay(-5)?\.png/, L.frame);
+    window.__layout = key;
   }
 
   // ---------- table screen wiring ----------
@@ -225,6 +261,60 @@
     cB.addEventListener('change', () => commit(cB));
   });
 
+  // ---------- move a player to the seat they're actually sitting in ----------
+  // Long-press a player's box (not a button), then tap the seat to move them to (swaps if taken).
+  let moveFrom = null, moveTimer = null, lpT = null, lpX = 0, lpY = 0;
+  seatEls.forEach((el, cell) => {
+    const ov = document.createElement('div');
+    ov.className = 'moveOv';
+    ov.innerHTML = `<span${cell === 4 ? ' style="transform: rotate(90deg);"' : cell >= 2 ? ' style="transform: rotate(180deg);"' : ''}></span>`;
+    el.appendChild(ov);
+    el.addEventListener('pointerdown', (e) => {
+      if (moveFrom !== null || (e.target.closest && e.target.closest('button, input'))) return;
+      if (!cellPlayers()[cell]) return;
+      lpX = e.clientX; lpY = e.clientY;
+      clearTimeout(lpT);
+      lpT = setTimeout(() => startMove(cell), 650);
+    });
+    el.addEventListener('pointermove', (e) => { if (lpT && Math.hypot(e.clientX - lpX, e.clientY - lpY) > 14) { clearTimeout(lpT); lpT = null; } });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => el.addEventListener(ev, () => { clearTimeout(lpT); lpT = null; }));
+  });
+  function paintMove() {
+    const cells = cellPlayers();
+    seatEls.forEach((el, cell) => {
+      const span = el.querySelector('.moveOv span');
+      el.classList.toggle('moveSrc', moveFrom === cell);
+      el.classList.toggle('moveDst', moveFrom !== null && moveFrom !== cell);
+      if (moveFrom === null) return;
+      const who = cells[moveFrom] && game.players[cells[moveFrom]];
+      const here = cells[cell] && game.players[cells[cell]];
+      span.textContent = moveFrom === cell
+        ? `MOVING ${who ? who.name.toUpperCase() : ''} · TAP HERE TO CANCEL`
+        : here ? `SWAP WITH ${here.name.toUpperCase()}` : 'MOVE HERE';
+    });
+  }
+  function startMove(cell) {
+    lpT = null;
+    moveFrom = cell;
+    try { navigator.vibrate && navigator.vibrate(25); } catch {}
+    paintMove();
+    clearTimeout(moveTimer);
+    moveTimer = setTimeout(endMove, 12000);
+  }
+  function endMove() { moveFrom = null; clearTimeout(moveTimer); paintMove(); }
+  // while moving, the next tap on any seat picks the destination (and nothing else fires)
+  document.addEventListener('pointerdown', (e) => {
+    if (moveFrom === null) return;
+    const seat = e.target.closest && e.target.closest('.seat');
+    e.stopPropagation(); e.preventDefault();
+    if (!seat) { endMove(); return; }
+    const to = Number(seat.dataset.cell);
+    const id = cellPlayers()[moveFrom];
+    if (to !== moveFrom && id) mAct('setSeat', { targetId: id, seat: to });
+    endMove();
+  }, true);
+  document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('.seat.moveDst, .seat.moveSrc')) { e.stopPropagation(); e.preventDefault(); } }, true);
+
   // End Turn: press-down animation + vibration so it feels like a physical button
   (() => {
     const b = $('endTurn');
@@ -245,6 +335,7 @@
   }
 
   function render() {
+    applyLayout(isFive());
     const cells = cellPlayers();
     $('joinOv').classList.toggle('open', game.turnOrder.length === 0);
 
@@ -260,6 +351,17 @@
       el.style.opacity = p ? '1' : '0.55';
 
       el.querySelector('.cmdOv').style.display = 'none';
+      const cd = el.querySelector('.cmdDmg');
+      if (cd) {
+        const entries = p ? Object.entries(p.cmdDamage || {}).filter(([fid, v]) => v > 0 && game.players[fid]) : [];
+        const html = entries.map(([fid, v]) => {
+          const o = game.players[fid];
+          const art = o.commander && (o.commander.art || o.commander.image);
+          const cls = v >= 21 ? ' lethal' : v >= 15 ? ' warn' : '';
+          return `<div class="cdChip${cls}"><i${art ? ` style='background-image: ${cssUrl(art).replace(/'/g, '%27')}'` : ''}></i><em>${esc(o.name.toUpperCase())}</em><b>${v}</b></div>`;
+        }).join('');
+        if (cd.dataset.h !== html) { cd.dataset.h = html; cd.innerHTML = html; }
+      }
     });
 
     const act = game.players[activeId()];
@@ -279,7 +381,7 @@
     const id = cellPlayers()[openCmdCell];
     const p = id ? game.players[id] : null;
     if (!p) { closeCmd(); return; }
-    $('cmdCard').classList.toggle('flip', openCmdCell >= 2); // top seats read it from across the table
+    $('cmdCard').classList.toggle('flip', openCmdCell === 2 || openCmdCell === 3); // top seats read it from across the table
     $('cmdTitle').textContent = `COMMANDER DAMAGE \u2014 ${p.name.toUpperCase()}`;
     const list = $('cmdList');
     const opps = game.turnOrder.filter((oid) => oid !== id && game.players[oid]);
@@ -379,11 +481,6 @@
   // ---------- menu ----------
   on('menuBtn', 'click', () => $('menuSheet').classList.add('open'));
   on('mClose', 'click', () => $('menuSheet').classList.remove('open'));
-  on('mRotate', 'click', () => {
-    seatOffset = (seatOffset + 1) % Math.max(game.turnOrder.length, 1);
-    store.setItem('seatOffset', String(seatOffset));
-    render();
-  });
   on('mTimerStart', 'click', () => {
     const m = parseInt(prompt('Global timer — minutes per turn (1-10):', '5'), 10);
     if (m >= 1 && m <= 10) { mAct('timerStart', { seconds: m * 60 }); $('menuSheet').classList.remove('open'); }

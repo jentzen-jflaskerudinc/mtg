@@ -88,15 +88,6 @@
     dragX = 0;
   });
 
-  // seat rotation lives on this device (Up/Down on the remote rotates, or ?seat=N)
-  let seatOffset = parseInt((Q.match(/[?&]seat=(\d+)/) || [])[1] || store.getItem('tv2SeatOffset') || '0', 10);
-  function rotateSeats(dir) {
-    const n = Math.max(game.turnOrder.length, 1);
-    seatOffset = (seatOffset + dir + n) % n;
-    store.setItem('tv2SeatOffset', String(seatOffset));
-    render();
-  }
-
   // QR join screen: JOIN button, OK on the remote, or Q. Shown automatically when nobody has joined.
   let qrManual = false;
   const noPlayers = () => false;
@@ -114,8 +105,6 @@
     if (qrOpen() && !noPlayers() && ['Enter', ' ', 'Escape', 'Backspace', 'GoBack', 'BrowserBack', 'q', 'Q'].includes(k)) { e.preventDefault(); showQr(false); return; }
     if (k === 'ArrowRight') go(1);
     else if (k === 'ArrowLeft') go(-1);
-    else if (k === 'ArrowUp') rotateSeats(1);
-    else if (k === 'ArrowDown') rotateSeats(-1);
     else if (k === 'Enter' || k === ' ' || k === 'q' || k === 'Q') { e.preventDefault(); showQr(true); }
   });
 
@@ -154,10 +143,50 @@
   const activeId = () => game.turnOrder[game.activeIdx];
   const cssUrl = (u) => `url("${String(u).replace(/'/g, '%27').replace(/["\\\n]/g, (c) => '\\' + c)}")`;
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // cell order 0=BL 1=BR 2=TR 3=TL 4=left end. Each player sits in the cell matching their seat
+  // (chosen on the phone or moved on the tablet); anyone without a seat fills the gaps.
+  // The left-end seat (5-player layout) appears when a 5th player joins or someone takes that seat.
+  function isFive() {
+    const ids = game.turnOrder.filter((id) => game.players[id]);
+    return ids.length >= 5 || ids.some((id) => game.players[id].seat === 4);
+  }
   function cellPlayers() {
-    const ids = game.turnOrder, n = ids.length, cells = [null, null, null, null];
-    for (let i = 0; i < Math.min(n, 4); i++) cells[i] = ids[(i + seatOffset) % n];
+    const five = isFive();
+    const n = five ? 5 : 4;
+    const cells = [null, null, null, null, null];
+    const ids = game.turnOrder.filter((id) => game.players[id]);
+    const loose = [];
+    ids.forEach((id) => {
+      const s = game.players[id].seat;
+      if (Number.isInteger(s) && s >= 0 && s < n && !cells[s]) cells[s] = id; else loose.push(id);
+    });
+    for (let c = 0; c < n && loose.length; c++) if (!cells[c]) cells[c] = loose.shift();
     return cells;
+  }
+  // 4-seat and 5-seat geometry (5-seat: four boxes shift right/narrow, ring centre moves to x=949)
+  const LAYOUTS = {
+    4: { cx: 799, frame: 'table-frame-overlay.png', cells: [[20, 494, 766, 478], [804, 494, 762, 478], [804, 20, 762, 457], [20, 20, 766, 457]] },
+    5: { cx: 949, frame: 'table-frame-overlay-5.png', cells: [[320, 494, 616, 478], [954, 494, 612, 478], [954, 20, 612, 457], [320, 20, 616, 457]] },
+  };
+  let layoutNow = null;
+  function applyLayout(five) {
+    const key = five ? 5 : 4;
+    if (layoutNow === key) return;
+    layoutNow = key;
+    const L = LAYOUTS[key], CY = 483;
+    document.querySelectorAll('#pgTable .seat').forEach((el) => {
+      const c = Number(el.dataset.cell);
+      if (c === 4) { el.style.display = five ? 'block' : 'none'; return; }
+      const [x, y, w, h] = L.cells[c];
+      Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+      const m = `radial-gradient(circle at ${L.cx - x}px ${CY - y}px, rgba(0,0,0,0) 0 164px, rgba(0,0,0,1) 167px)`;
+      el.style.webkitMaskImage = m; el.style.maskImage = m;
+    });
+    const hub = document.getElementById('hub');
+    if (hub) hub.style.left = L.cx + 'px';
+    const fr = document.getElementById('frameOv');
+    if (fr) fr.src = fr.src.replace(/table-frame-overlay(-5)?\.png/, L.frame);
+    window.__layout = key;
   }
 
   const seatEls = Array.from(document.querySelectorAll('.seat')).sort((a, b) => a.dataset.cell - b.dataset.cell);
@@ -165,6 +194,7 @@
   const lastLife = {};
 
   function render() {
+    applyLayout(isFive());
     const cells = cellPlayers();
     $('joinOv').classList.toggle('open', qrManual);
     const act = activeId();
@@ -203,7 +233,7 @@
           const o = game.players[fid];
           const art = o.commander && (o.commander.art || o.commander.image);
           const cls = v >= 21 ? ' lethal' : v >= 15 ? ' warn' : '';
-          return `<div class="cdChip${cls}" title="${esc(o.name)}"><i${art ? ` style='background-image: ${cssUrl(art).replace(/'/g, '%27')}'` : ''}></i><b>${v}</b></div>`;
+          return `<div class="cdChip${cls}"><i${art ? ` style='background-image: ${cssUrl(art).replace(/'/g, '%27')}'` : ''}></i><em>${esc(o.name.toUpperCase())}</em><b>${v}</b></div>`;
         }).join('');
         if (cd.dataset.h !== html) { cd.dataset.h = html; cd.innerHTML = html; }
       }
@@ -261,12 +291,12 @@
   if (!PARTICLES && cv) cv.style.display = 'none';
   if (PARTICLES && cv && cv.getContext && cv.getContext('2d')) {
     const ctx = cv.getContext('2d');
-    const CELLS = [[20, 494, 766, 478], [804, 494, 762, 478], [804, 20, 762, 457], [20, 20, 766, 457]];
+    const cellsNow = () => [...LAYOUTS[layoutNow || 4].cells, [20, 20, 260, 952]];
     const COUNT = 46;
     const motes = [];
     function spawn(m, fresh) {
       const biased = activeCell >= 0 && Math.random() < 0.45;
-      if (biased) { const c = CELLS[activeCell]; m.x = c[0] + Math.random() * c[2]; m.y = c[1] + (fresh ? Math.random() : 0.75 + Math.random() * 0.25) * c[3]; }
+      if (biased) { const c = cellsNow()[activeCell]; m.x = c[0] + Math.random() * c[2]; m.y = c[1] + (fresh ? Math.random() : 0.75 + Math.random() * 0.25) * c[3]; }
       else { m.x = Math.random() * 1586; m.y = fresh ? Math.random() * 992 : 992 + Math.random() * 40; }
       m.r = 0.8 + Math.random() * 2.2;
       m.vy = -(0.12 + Math.random() * 0.35);
