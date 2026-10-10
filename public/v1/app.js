@@ -181,31 +181,32 @@ function leaveGame() {
   if (j && j.code && !PREVIEW) joinGame(j.code, store.get('pw.' + j.code, ''), j.as);
 })();
 
-// ---------- stage scaling (same "fill the screen" approach as /tablet and /tv2) ----------
-function useStageScale(w, h, mode) {
-  const ref = useRef(null);
+// ---------- stage: a fixed-detail canvas that reshapes to the screen ----------
+// The shorter side is always `min` design pixels; the longer side follows the screen's shape,
+// so nothing is stretched or squashed. Tables and TVs turn sideways on a portrait screen.
+function useViewport() {
+  const read = () => ({ w: (window.visualViewport && window.visualViewport.width) || innerWidth, h: (window.visualViewport && window.visualViewport.height) || innerHeight });
+  const [v, setV] = useState(read);
   useEffect(() => {
-    const fit = () => {
-      const el = ref.current; if (!el) return;
-      const vw = (window.visualViewport && window.visualViewport.width) || innerWidth;
-      const vh = (window.visualViewport && window.visualViewport.height) || innerHeight;
-      let sx = vw / w, sy = vh / h;
-      if (mode === 'contain') sx = sy = Math.min(sx, sy);
-      el.style.width = w + 'px'; el.style.height = h + 'px';
-      el.style.transform = `scale(${sx}, ${sy})`;
-      el.style.left = (vw - w * sx) / 2 + 'px';
-      el.style.top = (vh - h * sy) / 2 + 'px';
-    };
-    fit();
-    addEventListener('resize', fit);
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
-    return () => { removeEventListener('resize', fit); if (window.visualViewport) window.visualViewport.removeEventListener('resize', fit); };
-  }, [w, h, mode]);
-  return ref;
+    const f = () => setV(read());
+    addEventListener('resize', f);
+    addEventListener('orientationchange', () => setTimeout(f, 250));
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', f);
+    return () => { removeEventListener('resize', f); if (window.visualViewport) window.visualViewport.removeEventListener('resize', f); };
+  }, []);
+  return v;
 }
-function Stage({ w = 1586, h = 992, mode, children }) {
-  const ref = useStageScale(w, h, mode);
-  return html`<div id="stage" ref=${ref}>${children}</div>`;
+function Stage({ min = 992, minRatio = 1, maxRatio = 2.4, turnPortrait = false, render }) {
+  const { w: vw, h: vh } = useViewport();
+  const turn = turnPortrait && vh > vw;
+  const sw = turn ? vh : vw, sh = turn ? vw : vh;
+  const wide = sw >= sh;
+  const ratio = Math.min(maxRatio, Math.max(minRatio, wide ? sw / sh : sh / sw));
+  const W = Math.round(wide ? min * ratio : min);
+  const H = Math.round(wide ? min : min * ratio);
+  const scale = Math.min(sw / W, sh / H);
+  const style = `width:${W}px;height:${H}px;left:50%;top:50%;transform:translate(-50%,-50%)${turn ? ' rotate(90deg)' : ''} scale(${scale})`;
+  return html`<div id="stage" style=${style}>${render(W, H)}</div>`;
 }
 
 // ---------- shared bits ----------
@@ -241,7 +242,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 function Setup() {
   const s = useStore().settings;
   const upd = (p) => { const n = MTG.normSettings({ ...s, ...p }); store.set('settings', n); set({ settings: n }); };
-  return html`<${Stage}><div class="tbl screen" style="width:1586px;height:992px">
+  return html`<div class="tbl screen">
     <div class="tblBlur" aria-hidden="true"></div>
     <${Title} sub="COMPANION APP" />
     <div class="card mgrCard frame9"><div class="cardBody">
@@ -266,7 +267,7 @@ function Setup() {
         <button class="goldBtn goldTex" onClick=${startLocal}>START LOCAL GAME</button>
       </div>
     </div></div>
-  </div><//>`;
+  </div>`;
 }
 
 // ---------- HOST ----------
@@ -284,7 +285,7 @@ function Host() {
     setBusy(false);
     if (e) setErr(PREVIEW ? 'ONLINE GAMES WORK ON THE LIVE APP, NOT IN THIS PREVIEW' : e);
   };
-  return html`<${Stage}><div class="tbl screen" style="width:1586px;height:992px">
+  return html`<div class="tbl screen">
     <div class="tblBlur" aria-hidden="true"></div>
     <${Title} sub="HOST A GAME" />
     <div class="card mgrCard frame9"><div class="cardBody">
@@ -305,7 +306,7 @@ function Host() {
         <button class="flatLink back" onClick=${() => go('setup')}><${Chevron} left />BACK TO SETUP</button>
       </div>
     </div></div>
-  </div><//>`;
+  </div>`;
 }
 
 // ---------- JOIN ----------
@@ -334,7 +335,7 @@ function Join({ initial }) {
     setBusy(false); if (e) setErr(e);
   };
   const locked = info ? info.locked : false;
-  return html`<${Stage}><div class="tbl screen" style="width:1586px;height:992px">
+  return html`<div class="tbl screen">
     <div class="tblBlur" aria-hidden="true"></div>
     <${Title} sub="JOIN A GAME" />
     <div class="card mgrCard frame9"><div class="cardBody">
@@ -355,22 +356,28 @@ function Join({ initial }) {
         <button class="flatLink back" onClick=${() => go('setup')}><${Chevron} left />BACK TO SETUP</button>
       </div>
     </div></div>
-  </div><//>`;
+  </div>`;
 }
 
 // ---------- seats ----------
-const QUADS = {
-  bl: { x: 20, y: 494, w: 766, h: 478, rot: 0 },
-  br: { x: 804, y: 494, w: 762, h: 478, rot: 0 },
-  tr: { x: 804, y: 20, w: 762, h: 457, rot: 180 },
-  tl: { x: 20, y: 20, w: 766, h: 457, rot: 180 },
-  bottom: { x: 20, y: 494, w: 1546, h: 478, rot: 0, wide: true },
-  top: { x: 20, y: 20, w: 1546, h: 457, rot: 180, wide: true },
-  solo: { x: 20, y: 20, w: 1546, h: 952, rot: 0, wide: true, solo: true },
-};
+function quadsAll(W, H) {
+  const m = 20, gap = 18;
+  const cw = (W - 2 * m - gap) / 2, rh = (H - 2 * m - gap) / 2;
+  const x2 = m + cw + gap, y2 = m + rh + gap;
+  return {
+    bl: { x: m, y: y2, w: cw, h: rh, rot: 0 },
+    br: { x: x2, y: y2, w: cw, h: rh, rot: 0 },
+    tr: { x: x2, y: m, w: cw, h: rh, rot: 180 },
+    tl: { x: m, y: m, w: cw, h: rh, rot: 180 },
+    bottom: { x: m, y: y2, w: W - 2 * m, h: rh, rot: 0, wide: true },
+    top: { x: m, y: m, w: W - 2 * m, h: rh, rot: 180, wide: true },
+    solo: { x: m, y: m, w: W - 2 * m, h: H - 2 * m, rot: 0, wide: true, solo: true },
+  };
+}
 // seat order runs clockwise around the table (Magic passes the turn to the left)
 const LAYOUTS = { 1: ['solo'], 2: ['bottom', 'top'], 3: ['bottom', 'tl', 'tr'], 4: ['bl', 'tl', 'tr', 'br'] };
-const quadsFor = (n) => (LAYOUTS[n] || LAYOUTS[4]).map((k) => QUADS[k]);
+const seatRot = (n, i) => (['tr', 'tl', 'top'].includes((LAYOUTS[n] || LAYOUTS[4])[i]) ? 180 : 0);
+const quadsFor = (n, W, H) => { const Q = quadsAll(W, H); return (LAYOUTS[n] || LAYOUTS[4]).map((k) => Q[k]); };
 
 // running "+3 / −2" next to the life total, cleared after a pause
 function useDelta(life) {
@@ -479,15 +486,18 @@ function Table() {
   const g = st.game;
   const [menu, setMenu] = useState(-1);
   const n = g.seats.length;
-  const quads = quadsFor(n);
   const timerOn = g.settings.timerOn;
-  return html`<${Stage}><div class="tbl" style="position:relative;width:1586px;height:992px;overflow:hidden">
+  const vp = useViewport();
+  return html`<${Stage} turnPortrait minRatio=${1.25} render=${(W, H) => {
+    const quads = quadsFor(n, W, H);
+    return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
     ${quads.map((q, i) => html`<${Seat} key=${i} g=${g} i=${i} q=${q} canEdit=${true} showActive=${n > 1 && g.active === i && !g.seats[i].out} onMenu=${setMenu} />`)}
-    ${n > 1 && html`<${EndTurn} g=${g} x=${793} y=${488} enabled=${true} />`}
+    ${n > 1 && html`<${EndTurn} g=${g} x=${W / 2} y=${H / 2} enabled=${true} />`}
     ${n === 1 && timerOn && html`<${SoloClock} g=${g} />`}
-    ${menu >= 0 && html`<${Menu} g=${g} i=${menu} rot=${quads[menu].rot} isHost=${true} onClose=${() => setMenu(-1)} />`}
     ${PREVIEW && html`<${PreviewBar} />`}
-  </div><//>`;
+  </div>`;
+  }} />
+  ${menu >= 0 && html`<${Menu} g=${g} i=${menu} rot=${vp.h > vp.w ? 0 : seatRot(n, menu)} isHost=${true} onClose=${() => setMenu(-1)} />`}`;
 }
 function SoloClock({ g }) {
   const rem = remaining(g, useNow());
@@ -500,22 +510,23 @@ function PlayerView() {
   const g = st.game;
   const i = st.seat;
   const [menu, setMenu] = useState(-1);
-  const [portrait, setPortrait] = useState(innerHeight > innerWidth);
-  useEffect(() => { const f = () => setPortrait(innerHeight > innerWidth); addEventListener('resize', f); return () => removeEventListener('resize', f); }, []);
   if (!g || i < 0 || !g.seats[i]) return html`<${Waiting} text="CONNECTING…" />`;
   const mine = g.active === i;
-  return html`<${Stage}><div class="tbl" style="position:relative;width:1586px;height:992px;overflow:hidden">
-    <${Seat} g=${g} i=${i} q=${QUADS.solo} canEdit=${true} showActive=${mine} onMenu=${setMenu} />
-    ${mine ? html`<${EndTurn} g=${g} x=${1380} y=${270} enabled=${true} />`
-      : html`<div class="sub" style="position:absolute;top:44px;right:60px;z-index:6;font-size:15px">${MTG.seatLabel(g, g.active).toUpperCase()}'S TURN</div>`}
+  return html`<${Stage} min=${900} render=${(W, H) => {
+    const q = quadsAll(W, H).solo;
+    const tall = H > W;
+    return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
+    <${Seat} g=${g} i=${i} q=${q} canEdit=${true} showActive=${mine} onMenu=${setMenu} />
+    ${mine ? html`<${EndTurn} g=${g} x=${tall ? W / 2 : W - 190} y=${tall ? H - 270 : 210} enabled=${true} />`
+      : html`<div class="sub" style=${`position:absolute;${tall ? 'bottom:120px;left:0;right:0;text-align:center' : 'top:44px;right:60px'};z-index:6;font-size:15px`}>${MTG.seatLabel(g, g.active).toUpperCase()}'S TURN</div>`}
     ${!st.conn && html`<div class="connDot" title="Reconnecting"></div>`}
-    ${portrait && html`<div class="sub" style="position:absolute;bottom:90px;left:0;right:0;text-align:center;z-index:8">TURN YOUR PHONE SIDEWAYS</div>`}
-    ${menu >= 0 && html`<${Menu} g=${g} i=${i} rot=${0} isHost=${false} onClose=${() => setMenu(-1)} />`}
-  </div><//>`;
+  </div>`;
+  }} />
+  ${menu >= 0 && html`<${Menu} g=${g} i=${i} rot=${0} isHost=${false} onClose=${() => setMenu(-1)} />`}`;
 }
 function Waiting({ text }) {
-  return html`<${Stage}><div class="tbl screen" style="width:1586px;height:992px"><div class="tblBlur"></div><${Title} sub=${text} />
-    <button class="flatLink back" style="width:auto;position:relative;z-index:1" onClick=${leaveGame}><${Chevron} left />BACK</button></div><//>`;
+  return html`<div class="tbl screen"><div class="tblBlur"></div><${Title} sub=${text} />
+    <button class="flatLink back" style="width:auto;position:relative;z-index:1" onClick=${leaveGame}><${Chevron} left />BACK</button></div>`;
 }
 
 // ---------- menu ----------
@@ -559,8 +570,13 @@ function Menu({ g, i, rot, isHost, onClose }) {
   };
   const exit = () => { if (confirm !== 'exit') { setConfirm('exit'); return; } leaveGame(); };
 
-  return html`<div class="veil" onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <div class="menu mgrCard" style=${{ transform: rot ? 'rotate(180deg)' : 'none' }} role="dialog" aria-label=${HEAD[tab]}>
+  const vp = useViewport();
+  const side = rot % 180 !== 0;
+  const aw = (side ? vp.h : vp.w) - 24, ah = (side ? vp.w : vp.h) - 24;
+  const sc = Math.min(1, aw / 560);
+  const maxH = Math.floor(ah / sc);
+  return html`<div class="veil" style="position:fixed" onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div class="menu mgrCard" style=${{ transform: `rotate(${rot}deg) scale(${sc})`, maxHeight: maxH + 'px', minHeight: Math.min(820, maxH) + 'px' }} role="dialog" aria-label=${HEAD[tab]}>
       <div class="menuHead">
         ${tab && html`<button class="iconBtn" aria-label="Back" onClick=${back}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button>`}
         <div class="col" style="flex:1 1 0;gap:2px">
@@ -801,7 +817,6 @@ function Tv({ g }) {
   const now = useNow();
   const [page, setPage] = useState(0);
   const n = g.seats.length;
-  const quads = quadsFor(n);
   useEffect(() => {
     const k = (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') setPage((p) => 1 - p); };
     addEventListener('keydown', k);
@@ -809,19 +824,27 @@ function Tv({ g }) {
   }, []);
   const rem = remaining(g, now);
   const nextSeat = MTG.nextActive(g).seat;
-  return html`<${Stage}><div class="tbl" style="position:relative;width:1586px;height:992px;overflow:hidden">
+  return html`<${Stage} turnPortrait minRatio=${1.3} render=${(W, H) => {
+    const quads = quadsFor(n, W, H);
+    return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
     ${page === 0 ? html`
       ${quads.map((q, i) => html`<${TvSeat} key=${i} g=${g} i=${i} q=${q} />`)}
-      <${Motes} g=${g} quads=${quads} />
-      ${n > 1 && html`<div style="position:absolute;left:793px;top:483px;width:300px;height:0;margin-left:-150px;z-index:12">
+      <${Motes} g=${g} quads=${quads} W=${W} H=${H} />
+      ${n > 1 && html`<div style=${`position:absolute;left:${W / 2}px;top:${H / 2}px;width:300px;height:0;margin-left:-150px;z-index:12`}>
         <div style="position:absolute;left:-90px;right:-90px;bottom:42px;display:flex;justify-content:center"><span class="hubTag" style="color:var(--bright);font-size:15px;letter-spacing:0.11em">${MTG.seatLabel(g, g.active).toUpperCase()}'S TURN</span></div>
         <div style="position:absolute;left:0;right:0;top:-32px;height:63px;display:flex;justify-content:center">
           <div id="timerPlate" class=${rem !== null && rem <= 30 ? 'low' : ''}>${rem === null ? html`<span class="s">TURN ${g.round}</span>` : rem <= 0 ? html`<span class="s">TIME!</span>` : html`<span class="t">${fmt(rem)}</span>`}</div>
         </div>
         ${nextSeat !== g.active && html`<div style="position:absolute;left:-90px;right:-90px;top:44px;display:flex;justify-content:center"><span class="hubTag">NEXT · ${MTG.seatLabel(g, nextSeat).toUpperCase()}</span></div>`}
+        ${g.code && html`<div style=${`position:absolute;left:-90px;right:-90px;top:${nextSeat !== g.active ? 86 : 44}px;display:flex;justify-content:center`}><${CodeTag} g=${g} /></div>`}
       </div>`}
+      ${n === 1 && g.code && html`<div style="position:absolute;top:34px;right:44px;z-index:12"><${CodeTag} g=${g} /></div>`}
     ` : html`<${TvCommanders} g=${g} />`}
-  </div><//>`;
+  </div>`;
+  }} />`;
+}
+function CodeTag({ g }) {
+  return html`<span class="hubTag codeTag">${g.mode === 'hosted' ? 'JOIN CODE' : 'GAME CODE'} <b class="pete">${g.code}</b></span>`;
 }
 function TvSeat({ g, i, q }) {
   const s = g.seats[i];
@@ -880,10 +903,10 @@ function TvCommanders({ g }) {
   </div>`;
 }
 // soft gold motes, denser over the active seat (from tv2)
-function Motes({ g, quads }) {
+function Motes({ g, quads, W = 1586, H = 992 }) {
   const ref = useRef(null);
-  const live = useRef({ g, quads });
-  live.current = { g, quads };
+  const live = useRef({ g, quads, W, H });
+  live.current = { g, quads, W, H };
   useEffect(() => {
     const cv = ref.current; if (!cv || !cv.getContext) return;
     if (/[?&]particles=off\b/.test(location.search) || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -893,7 +916,7 @@ function Motes({ g, quads }) {
       const { g: G, quads: Q } = live.current;
       const c = Q[G.active];
       if (c && G.seats.length > 1 && Math.random() < 0.45) { m.x = c.x + Math.random() * c.w; m.y = c.y + (fresh ? Math.random() : 0.75 + Math.random() * 0.25) * c.h; }
-      else { m.x = Math.random() * 1586; m.y = fresh ? Math.random() * 992 : 992 + Math.random() * 40; }
+      else { const L = live.current; m.x = Math.random() * L.W; m.y = fresh ? Math.random() * L.H : L.H + Math.random() * 40; }
       m.r = 0.8 + Math.random() * 2.2; m.vy = -(0.12 + Math.random() * 0.35); m.sw = Math.random() * 6.28; m.sws = 0.004 + Math.random() * 0.01;
       m.tw = Math.random() * 6.28; m.life = 0; m.max = 500 + Math.random() * 700; return m;
     };
@@ -908,7 +931,7 @@ function Motes({ g, quads }) {
       raf = requestAnimationFrame(frame);
       if (ts - last < 32 || document.hidden) return;
       const dt = Math.min((ts - last) / 16.7, 3); last = ts;
-      ctx.clearRect(0, 0, 1586, 992); ctx.globalCompositeOperation = 'lighter';
+      ctx.clearRect(0, 0, cv.width, cv.height); ctx.globalCompositeOperation = 'lighter';
       for (const m of motes) {
         m.life += dt; m.sw += m.sws * dt; m.tw += 0.05 * dt; m.y += m.vy * dt; m.x += Math.sin(m.sw) * 0.25 * dt;
         const fade = Math.min(1, m.life / 60, (m.max - m.life) / 90);
@@ -922,7 +945,7 @@ function Motes({ g, quads }) {
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
   }, []);
-  return html`<canvas ref=${ref} width="1586" height="992" style="position:absolute;inset:0;z-index:7;pointer-events:none"></canvas>`;
+  return html`<canvas ref=${ref} width=${W} height=${H} style="position:absolute;inset:0;z-index:7;pointer-events:none"></canvas>`;
 }
 
 // TV entry: type the code with the remote, or arrive with /v1/tv#/tv/CODE
@@ -942,7 +965,7 @@ function TvEntry({ initial }) {
   };
   useEffect(() => { if (initial && initial.length === 6 && !tried.current) { tried.current = true; connect(initial.toUpperCase()); } }, []);
   if (st.game && (st.role === 'tv' || st.role === 'spectator')) return html`<${Tv} g=${st.game} />`;
-  return html`<${Stage}><div class="tbl screen" style="width:1586px;height:992px">
+  return html`<div class="tbl screen">
     <div class="tblBlur" aria-hidden="true"></div>
     <${Title} sub="TV DISPLAY" />
     <div class="card mgrCard frame9"><div class="cardBody">
@@ -956,7 +979,7 @@ function TvEntry({ initial }) {
       <button class="goldBtn goldTex" onClick=${() => connect()}>SHOW GAME</button>
       <div style="height:12px"></div>
     </div></div>
-  </div><//>`;
+  </div>`;
 }
 
 function Watch() {
