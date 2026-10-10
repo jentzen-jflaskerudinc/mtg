@@ -57,14 +57,25 @@ function client() {
   check('wrong password rejected', phone.last('error') && /Wrong password/.test(phone.last('error').error));
   phone.send({ t: 'join', code: 'TEST22', password: 'dragon', as: 'player', clientId: 'p1' });
   await sleep(100);
-  check('right password joins seat 0', phone.last('joined') && phone.last('joined').seat === 0);
+  check('right password joins without a seat yet', phone.last('joined') && phone.last('joined').seat === -1);
+  phone.send({ t: 'act', a: { type: 'life', seat: 1, d: -1 } });
+  await sleep(80);
+  check("seatless phone can't change anything", host.game.seats[1].life === 30);
+  phone.send({ t: 'sit', seat: 1 });
+  await sleep(100);
+  check('phone picks seat 1', phone.last('sat') && phone.last('sat').seat === 1 && host.game.seats[1].owner === true);
+  phone.send({ t: 'sit', seat: 0 });
+  await sleep(100);
+  check('phone moves to seat 0 and frees seat 1', phone.seat === 0 && host.game.seats[0].owner === true && host.game.seats[1].owner === null);
 
   phone.send({ t: 'act', a: { type: 'life', seat: 0, d: -4 } });
   await sleep(100);
   check('phone changes its own life, host sees it', host.game.seats[0].life === 26);
   phone.send({ t: 'act', a: { type: 'life', seat: 1, d: -10 } });
   await sleep(100);
-  check("phone can't touch another seat", host.game.seats[1].life === 30);
+  check('seated phone can change another seat, like the tablet', host.game.seats[1].life === 20);
+  host.send({ t: 'act', a: { type: 'life', seat: 1, d: 10 } });
+  await sleep(80);
   phone.send({ t: 'act', a: { type: 'reset' } });
   await sleep(80);
   check("phone can't reset the game", host.game.seats[0].life === 26);
@@ -73,7 +84,7 @@ function client() {
   check('active phone ends its turn', host.game.active === 1);
   phone.send({ t: 'act', a: { type: 'endTurn' } });
   await sleep(100);
-  check("phone can't end someone else's turn", host.game.active === 1);
+  check('any seated phone can press End Turn', host.game.active === 0);
   host.send({ t: 'act', a: { type: 'life', seat: 1, d: -3 } });
   await sleep(100);
   check('host controls any seat', phone.game.seats[1].life === 27);
@@ -99,6 +110,12 @@ function client() {
   phone2.send({ t: 'join', code: 'TEST22', password: 'dragon', as: 'player', clientId: 'p1' });
   await sleep(100);
   check('rejoining phone gets its seat back', phone2.last('joined') && phone2.last('joined').seat === 0);
+  const other = await client();
+  other.send({ t: 'join', code: 'TEST22', password: 'dragon', as: 'player', clientId: 'p2' });
+  await sleep(80);
+  other.send({ t: 'sit', seat: 0 });
+  await sleep(80);
+  check("can't take a seat someone is in", other.last('error') && /already/.test(other.last('error').error));
 
   host.send({ t: 'end' });
   await sleep(100);

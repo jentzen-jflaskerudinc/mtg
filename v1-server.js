@@ -69,10 +69,9 @@ function attachV1(server) {
     const room = ws.room;
     if (!room || room.mode !== 'hosted') return false;
     if (ws.role === 'host') return true;
-    if (ws.role !== 'player') return false;
-    if (['reset', 'timer'].includes(a.type)) return false;
-    if (a.type === 'endTurn') return room.game.active === ws.seat;
-    return a.seat === ws.seat;
+    if (ws.role !== 'player' || ws.seat < 0) return false;
+    // seated players run the table like the tablet does; only the host resets or changes the timer
+    return !['reset', 'timer'].includes(a.type);
   }
 
   function onMessage(ws, m) {
@@ -130,13 +129,27 @@ function attachV1(server) {
         if (role === 'spectator' && !g.spectators) return send(ws, { t: 'error', error: 'The host turned spectators off' });
         let seat = -1;
         if (role === 'player') {
-          seat = g.seats.findIndex((s) => s.owner === clientId); // reclaim after a refresh
-          if (seat === -1) seat = g.seats.findIndex((s) => !s.owner);
-          if (seat === -1) return send(ws, { t: 'error', error: 'Game is full' });
-          g.seats[seat].owner = clientId;
+          // players pick their own seat after joining ('sit'); a refresh reclaims the one they had
+          seat = g.seats.findIndex((s) => s.owner === clientId);
+          if (seat === -1 && !g.seats.some((s) => !s.owner)) return send(ws, { t: 'error', error: 'Game is full' });
         }
         enter(ws, room, role, seat);
         send(ws, { t: 'joined', role, seat, game: view(room), now: now() });
+        broadcast(room);
+        return;
+      }
+      case 'sit': {
+        const room = ws.room;
+        if (!room || room.mode !== 'hosted' || ws.role !== 'player') return;
+        const k = Number(m.seat);
+        const seats = room.game.seats;
+        if (!Number.isInteger(k) || k < 0 || k >= seats.length) return;
+        if (seats[k].owner && seats[k].owner !== ws.clientId) return send(ws, { t: 'error', error: 'Someone already sat there' });
+        seats.forEach((s) => { if (s.owner === ws.clientId) s.owner = null; });
+        seats[k].owner = ws.clientId;
+        for (const c of room.clients) if (c.clientId === ws.clientId && c.role === 'player') c.seat = k;
+        room.touched = now();
+        send(ws, { t: 'sat', seat: k });
         broadcast(room);
         return;
       }
@@ -176,7 +189,7 @@ function attachV1(server) {
       }
       case 'leave': {
         const room = ws.room;
-        if (room && ws.role === 'player' && room.game.seats[ws.seat]) room.game.seats[ws.seat].owner = null;
+        if (room && ws.role === 'player') room.game.seats.forEach((s) => { if (s.owner === ws.clientId) s.owner = null; });
         leave(ws);
         return;
       }
