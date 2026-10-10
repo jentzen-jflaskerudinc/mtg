@@ -12,6 +12,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
+const { attachV1 } = require('./v1-server');
 
 const MASTER_PIN = process.env.MASTER_PIN || '1234';
 const STARTING_LIFE = 40;
@@ -23,6 +24,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/tv', (_, res) => res.sendFile(path.join(__dirname, 'public', 'tv.html')));
 app.get('/tablet', (_, res) => res.sendFile(path.join(__dirname, 'public', 'tablet.html')));
 app.get('/tv2', (_, res) => res.sendFile(path.join(__dirname, 'public', 'tv2.html')));
+app.get('/v1/tv', (_, res) => res.sendFile(path.join(__dirname, 'public', 'v1', 'tv.html')));
 app.get('/healthz', (_, res) => res.send('ok'));
 
 // Lists sound files in public/sounds grouped by category prefix.
@@ -42,7 +44,13 @@ app.get('/sounds-list', (_, res) => {
 });
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer: true });
+const v1 = attachV1(server);
+// one HTTP server, two sockets: /v1/ws for the new app, everything else for the legacy app
+server.on('upgrade', (req, socket, head) => {
+  const target = (req.url || '').split('?')[0] === '/v1/ws' ? v1.wss : wss;
+  target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
+});
 
 // ---------- Game state (in memory) ----------
 let state = newGameState();

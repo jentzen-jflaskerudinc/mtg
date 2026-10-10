@@ -10,6 +10,21 @@ Real-time life tracker: each player controls their own life from their phone, a 
 | `/tv` | Firestick | 4 corners with life, name, commander art. Center: turn number, turn order, active player's full card art. Shows a QR code to join when the game is empty |
 | `/` → ⚙ master | You | Enter PIN to unlock override: adjust anyone's life, force turns, set active player, remove players, reset life, new game |
 
+## v1 — MTG Companion (new app, beta)
+
+Lives alongside the classic app on the same service. Nothing above changes.
+
+| URL | What |
+|---|---|
+| `/v1/` | Tablet/phone app: setup, local game on the table, host or join an online game |
+| `/v1/tv` | TV display (tv2 layout, every number upright). Enter the code from the menu → TV DISPLAY / HOSTED GAME |
+| `/v1/#/join/CODE` | Invite link for hosted games |
+
+- **Local game:** the tablet runs everything (works offline). It also registers a 6-character code so a TV can mirror it.
+- **Hosted game:** the server runs the game; phones join a seat with the code (optional password), spectators can watch.
+- Shared rules engine: `public/v1/game.js` (used by both the browser and `v1-server.js`).
+- Tests: start the server, then `node test-v1.js`.
+
 ## Deploy to Render
 
 1. Push this folder to a GitHub repo.
