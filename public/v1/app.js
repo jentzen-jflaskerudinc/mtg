@@ -437,7 +437,7 @@ function Seat({ g, i, q, onMenu, canEdit, showActive }) {
   const detPos = q.wide && !q.solo ? 'left: 60px; width: 520px' : 'left: 130px; right: 130px';
   const cmdr = g.settings.commander;
   const art = s.cmdrs[0] && (s.cmdrs[0].art || s.cmdrs[0].image);
-  const compact = q.h < 360;
+  const compact = q.h < 440; // short seats (phones): menu button moves to the corner
   return html`<div class="seat" style=${`left:${q.x}px;top:${q.y}px;width:${q.w}px;height:${q.h}px`}>
     <div class="seatIn" style=${{ transform: q.rot ? 'rotate(180deg)' : 'none' }}>
       ${art && html`<div class="seatArt" aria-hidden="true" style=${{ backgroundImage: `url("${art}")` }}></div>`}
@@ -457,10 +457,10 @@ function Seat({ g, i, q, onMenu, canEdit, showActive }) {
       ${canEdit && html`<button class="lifeZone" aria-label="Lose one life" style="left:0;padding:0 0 0 38px;text-align:left" onClick=${() => d({ type: 'life', d: -1 })}>−</button>
       <button class="lifeZone" aria-label="Gain one life" style="right:0;padding:0 38px 0 0;text-align:right" onClick=${() => d({ type: 'life', d: 1 })}>+</button>`}
       <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:2">
-        <span class="lifeNum" aria-live="polite" style=${q.solo ? 'font-size:230px' : compact ? 'font-size:92px;margin-top:34px' : null}>${s.life}</span>
+        <span class="lifeNum" aria-live="polite" style=${q.solo ? 'font-size:230px' : compact ? 'font-size:118px' : null}>${s.life}</span>
       </div>
-      <div class="pete" style=${`position:absolute;top:calc(50% - ${q.solo ? 180 : 112}px);left:0;right:0;text-align:center;pointer-events:none;z-index:2;font-size:34px;color:${delta > 0 ? '#7FD08A' : '#E0715B'};text-shadow:0 2px 10px rgba(8,8,10,0.95)`}>${delta ? (delta > 0 ? '+' + delta : String(delta)) : ''}</div>
-      <div style=${`position:absolute;top:calc(50% + ${q.solo ? 150 : 88}px);left:0;right:0;display:flex;justify-content:center;z-index:2`}>
+      <div class="pete" style=${`position:absolute;top:calc(50% - ${q.solo ? 180 : compact ? 100 : 112}px);left:0;right:0;text-align:center;pointer-events:none;z-index:2;font-size:34px;color:${delta > 0 ? '#7FD08A' : '#E0715B'};text-shadow:0 2px 10px rgba(8,8,10,0.95)`}>${delta ? (delta > 0 ? '+' + delta : String(delta)) : ''}</div>
+      <div style=${compact ? 'position:absolute;top:8px;left:8px;z-index:3' : `position:absolute;top:calc(50% + ${q.solo ? 150 : 88}px);left:0;right:0;display:flex;justify-content:center;z-index:2`}>
         <button class="burger" aria-label="Menu" style=${canEdit ? null : { visibility: 'hidden' }} onClick=${() => onMenu(i)}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
           ${n > 0 && html`<span class="badge">${n}</span>`}
@@ -534,6 +534,20 @@ function SoloClock({ g }) {
 }
 
 // ---------- phone: just my seat ----------
+// phone grid: everyone upright. Wide screens use the table's quarters; tall screens stack seats with End Turn in the middle.
+function phoneGrid(n, W, H) {
+  const m = 20, gap = 18;
+  if (W >= H) return { quads: quadsFor(n, W, H).map((q) => ({ ...q, rot: 0 })), et: { x: W / 2, y: H / 2, s: 0.9 } };
+  const strip = n > 1 ? 200 : 0, half = Math.ceil(n / 2);
+  const h = (H - 2 * m - gap * (n - 1) - strip) / n;
+  const quads = []; let y = m, etY = H / 2;
+  for (let k = 0; k < n; k++) {
+    quads.push({ x: m, y, w: W - 2 * m, h, rot: 0 });
+    y += h + gap;
+    if (k === half - 1 && strip) { etY = y - gap / 2 + strip / 2; y += strip; }
+  }
+  return { quads, et: { x: W / 2, y: etY, s: 0.8 } };
+}
 // A phone that joined a game: the full table, exactly like the tablet (every seat, End Turn in the middle),
 // or just this player's seat. Before sitting down, open seats show SIT HERE.
 function PlayerView() {
@@ -547,33 +561,29 @@ function PlayerView() {
   if (!g) return html`<${Waiting} text="CONNECTING…" />`;
   const seated = i >= 0 && !!g.seats[i];
   const grid = gridPref || !seated;
-  const sit = (k) => {
-    const old = S.seat, nm = old >= 0 && g.seats[old] ? g.seats[old].name : '';
-    set({ seat: k }); net.send({ t: 'sit', seat: k });
-    if (nm && !g.seats[k].name) { dispatch({ type: 'name', seat: k, name: nm }); dispatch({ type: 'name', seat: old, name: '' }); } // your name moves with you
-  };
+  const sit = (k) => { set({ seat: k }); net.send({ t: 'sit', seat: k }); }; // the server moves your whole seat with you
   const n = g.seats.length;
   const mine = seated && g.active === i;
   const toggle = seated && html`<button class="viewToggle" onClick=${flip} aria-label=${grid ? 'Show only my seat' : 'Show all players'}>
     ${grid ? html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>MY SEAT`
-      : html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"></rect><rect x="13" y="3" width="8" height="8" rx="1"></rect><rect x="3" y="13" width="8" height="8" rx="1"></rect><rect x="13" y="13" width="8" height="8" rx="1"></rect></svg>ALL PLAYERS`}</button>`;
+      : html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"></rect><rect x="13" y="3" width="8" height="8" rx="1"></rect><rect x="3" y="13" width="8" height="8" rx="1"></rect><rect x="13" y="13" width="8" height="8" rx="1"></rect></svg>`}</button>`;
   const turned = vp.h > vp.w;
   const overlay = html`${toggle}${!seated && html`<div class="sitBanner">TAP AN OPEN SEAT TO SIT DOWN</div>`}${!st.conn && html`<div class="connDot" title="Reconnecting"></div>`}`;
   if (grid) {
-    return html`<${Stage} turnPortrait minRatio=${1.25} render=${(W, H) => {
-      const quads = quadsFor(n, W, H);
+    return html`<${Stage} min=${900} render=${(W, H) => {
+      const L = phoneGrid(n, W, H);
       return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
-        ${quads.map((q, k) => html`<${Seat} key=${k} g=${g} i=${k} q=${q} canEdit=${seated} showActive=${n > 1 && g.active === k && !MTG.isDead(g, k)} onMenu=${setMenu} />`)}
-        ${quads.map((q, k) => k === i || g.seats[k].owner ? null : !seated
+        ${L.quads.map((q, k) => html`<${Seat} key=${k} g=${g} i=${k} q=${q} canEdit=${seated} showActive=${n > 1 && g.active === k && !MTG.isDead(g, k)} onMenu=${setMenu} />`)}
+        ${L.quads.map((q, k) => k === i || g.seats[k].owner ? null : !seated
           ? html`<button class="sitHere" style=${`left:${q.x}px;top:${q.y}px;width:${q.w}px;height:${q.h}px`} onClick=${() => sit(k)}>
-              <span class="goldBtn goldTex" style=${`width:auto;padding:0 34px;transform:rotate(${q.rot}deg)`}>SIT HERE</span></button>`
-          : html`<div style=${`position:absolute;left:${q.x}px;top:${q.y}px;width:${q.w}px;height:${q.h}px;transform:rotate(${q.rot}deg);pointer-events:none;z-index:8`}>
-              <button class="movePill" onClick=${() => sit(k)}>MOVE HERE</button></div>`)}
-        ${n > 1 && html`<${EndTurn} g=${g} x=${W / 2} y=${H / 2} enabled=${seated} />`}
+              <span class="goldBtn goldTex" style="width:auto;padding:0 34px">SIT HERE</span></button>`
+          : html`<div style=${`position:absolute;left:${q.x}px;top:${q.y}px;width:${q.w}px;height:${q.h}px;pointer-events:none;z-index:8`}>
+              <button class="movePill" style="left:auto;right:18px" onClick=${() => sit(k)}>MOVE HERE</button></div>`)}
+        ${n > 1 && html`<div style=${`position:absolute;left:${L.et.x}px;top:${L.et.y}px;transform:scale(${L.et.s});z-index:12`}><${EndTurn} g=${g} x=${0} y=${0} enabled=${seated} /></div>`}
       </div>`;
     }} />
-    ${overlay}
-    ${menu >= 0 && html`<${Menu} g=${g} i=${menu} rot=${turned ? 0 : seatRot(n, menu)} isHost=${false} onClose=${() => setMenu(-1)} />`}`;
+    ${!seated && html`<div class="sitBanner">TAP AN OPEN SEAT TO SIT DOWN</div>`}${!st.conn && html`<div class="connDot" title="Reconnecting"></div>`}
+    ${menu >= 0 && html`<${Menu} g=${g} i=${menu} rot=${0} isHost=${false} onView=${menu === i ? flip : null} onClose=${() => setMenu(-1)} />`}`;
   }
   return html`<${Stage} min=${900} render=${(W, H) => {
     const tall = H > W;
@@ -594,13 +604,14 @@ function Waiting({ text }) {
 
 // ---------- menu ----------
 const HEAD = { '': 'MENU', add: 'COMMANDER', search: 'COMMANDER', cmd: 'COMMANDER DAMAGE', ctr: 'COUNTERS', status: 'STATUS', extra: 'EXTRA TURNS', timer: 'TURN TIMER', host: 'HOSTED GAME' };
-function Menu({ g, i, rot, isHost, onClose }) {
+function Menu({ g, i, rot, isHost, onClose, onView }) {
   const st = useStore();
   const [tab, setTab] = useState('');
   const [pick, setPick] = useState(false);
   const [custom, setCustom] = useState('');
   const [confirm, setConfirm] = useState('');
   const [editIdx, setEditIdx] = useState(-1);
+  const [zoom, setZoom] = useState(null);
   const s = g.seats[i];
   const d = (a) => dispatch({ ...a, seat: i });
   const goTab = (t) => { setTab(t); setPick(false); setCustom(''); setConfirm(''); };
@@ -619,6 +630,7 @@ function Menu({ g, i, rot, isHost, onClose }) {
   items.push({ label: 'STATUS', summary: statOn.map((f) => f.label).join(' · '), t: 'status' });
   const exN = MTG.extraCount(g, i);
   if (n > 1) items.push({ label: 'EXTRA TURN', summary: exN ? exN + (exN > 1 ? ' EXTRA TURNS QUEUED' : ' EXTRA TURN QUEUED') : '', t: 'extra' });
+  if (onView) items.push({ label: 'SHOW ONLY MY SEAT', summary: 'ONE BIG LIFE TOTAL', fn: () => { onClose(); onView(); } });
   if (isHost) {
     items.push({ label: 'TURN TIMER', summary: g.settings.timerOn ? g.settings.mins + ' MIN PER TURN' : 'OFF', t: 'timer' });
     items.push({ label: local ? 'TV DISPLAY' : 'HOSTED GAME', summary: g.code ? 'CODE ' + g.code + (g.locked ? ' · PASSWORD ON' : '') : (st.conn ? 'CONNECTING…' : 'OFFLINE'), t: 'host' });
@@ -653,7 +665,7 @@ function Menu({ g, i, rot, isHost, onClose }) {
 
       ${tab === '' && html`
         <div class="col" style="align-items:flex-start;gap:8px;padding:8px 0 4px">
-          ${items.map((it) => html`<button class="menuItem" onClick=${() => goTab(it.t)}><span>${it.label}<${Chevron} /></span><span class="subGold">${it.summary}</span></button>`)}
+          ${items.map((it) => html`<button class="menuItem" onClick=${() => (it.fn ? it.fn() : goTab(it.t))}><span>${it.label}<${Chevron} /></span><span class="subGold">${it.summary}</span></button>`)}
         </div>
         <div class="col" style="gap:8px;padding-top:16px;margin-top:auto">
           <button class=${'concede' + (confirm === 'concede' ? ' armed' : '') + (s.out ? ' rejoin' : '')} onClick=${concede}>${s.out ? 'REJOIN GAME' : confirm === 'concede' ? 'TAP AGAIN TO CONCEDE' : 'CONCEDE'}</button>
@@ -665,8 +677,10 @@ function Menu({ g, i, rot, isHost, onClose }) {
 
       ${tab === 'add' && html`<div class="col" style="gap:30px;padding-top:56px">
         ${s.cmdrs.map((c, k) => html`<div class="ruled" style="padding-bottom:18px"><div style="min-height:72px;display:flex;align-items:center;gap:16px">
-          <span class="art" style=${c.art ? { backgroundImage: `url("${c.art}")` } : null}>${c.art ? '' : 'ART'}</span>
-          <span class="col" style="flex:1 1 0;min-width:0"><span style="font-size:11px;font-weight:700;letter-spacing:0.18em;color:var(--gold-dim)">${k === 0 ? 'COMMANDER' : 'PARTNER'}</span><span style="font-size:17px;font-weight:700;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.name.toUpperCase()}</span></span>
+          <button class="cardOpen" aria-label=${'View ' + c.name} onClick=${() => setZoom(c)}>
+            <span class="art" style=${c.art ? { backgroundImage: `url("${c.art}")` } : null}>${c.art ? '' : 'ART'}</span>
+            <span class="col" style="flex:1 1 0;min-width:0;text-align:left"><span style="font-size:11px;font-weight:700;letter-spacing:0.18em;color:var(--gold-dim)">${k === 0 ? 'COMMANDER' : 'PARTNER'} · TAP TO VIEW</span><span style="font-size:17px;font-weight:700;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--bright)">${c.name.toUpperCase()}</span></span>
+          </button>
           <button class="textBtn" onClick=${() => { setEditIdx(k); goTab('search'); }}>CHANGE</button>
         </div></div>`)}
         ${s.cmdrs.length < 2 && html`<button class="pickRow" style="min-height:84px" onClick=${() => { setEditIdx(-1); goTab('search'); }}>
@@ -741,6 +755,21 @@ function Menu({ g, i, rot, isHost, onClose }) {
       </div>`}
 
       ${tab === 'host' && html`<${HostPanel} g=${g} />`}
+    </div>
+    ${zoom && html`<${CardZoom} c=${zoom} rot=${rot} onClose=${() => setZoom(null)} />`}
+  </div>`;
+}
+
+// full-size card, tap anywhere to close
+function CardZoom({ c, rot, onClose }) {
+  const vp = useViewport();
+  const side = rot % 180 !== 0;
+  const h = Math.min((side ? vp.w : vp.h) - 60, ((side ? vp.h : vp.w) - 40) * 1.395);
+  return html`<div class="cardZoom" role="dialog" aria-label=${c.name} onClick=${(e) => { e.stopPropagation(); onClose(); }}>
+    <div style=${{ transform: `rotate(${rot}deg)`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+      ${c.image ? html`<img src=${c.image} alt=${c.name} style=${{ height: h + 'px', width: 'auto', maxWidth: ((side ? vp.h : vp.w) - 40) + 'px', objectFit: 'contain', borderRadius: (h * 0.045) + 'px', boxShadow: '0 0 60px rgba(0,0,0,0.9)' }} />`
+        : html`<div class="cmdrCard" style=${{ height: h + 'px', width: (h / 1.395) + 'px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px', boxSizing: 'border-box' }}><span class="lbl">${c.name.toUpperCase()}<br /><span class="sub">NO CARD IMAGE</span></span></div>`}
+      <span class="sub">TAP ANYWHERE TO CLOSE</span>
     </div>
   </div>`;
 }

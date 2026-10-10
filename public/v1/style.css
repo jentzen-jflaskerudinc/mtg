@@ -224,9 +224,11 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 }
 .codeTag { display: inline-flex; align-items: center; gap: 10px; color: var(--gold-dim); }
 .codeTag b { font-weight: 400; font-size: 22px; letter-spacing: 0.16em; color: var(--white); }
-.viewToggle { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 10px; z-index: 40; height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--edge); border-radius: 28px; background: rgba(8,8,10,0.82); color: var(--gold); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; box-shadow: 0 4px 14px rgba(0,0,0,0.7); }
+.viewToggle { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 10px; z-index: 40; height: 44px; width: 44px; justify-content: center; padding: 0; display: flex; align-items: center; gap: 10px; border: 1px solid var(--edge); border-radius: 28px; background: rgba(8,8,10,0.82); color: var(--gold); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; box-shadow: 0 4px 14px rgba(0,0,0,0.7); }
 .endTurn:disabled { filter: grayscale(0.5) brightness(0.62); cursor: default; animation: none; }
 .sitHere { position: absolute; z-index: 8; padding: 0; border: none; background: rgba(8,8,10,0.55); display: flex; align-items: center; justify-content: center; }
 .sitHere .goldBtn { height: 72px; pointer-events: none; }
 .sitBanner { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 40; padding: 10px 18px; border-radius: 20px; font-size: 12px !important; background: rgba(8,8,10,0.88); border: 1px solid var(--edge); color: var(--gold); font-size: 16px; font-weight: 700; letter-spacing: 0.16em; white-space: nowrap; }
 .movePill { position: absolute; top: 18px; left: 18px; height: 52px; padding: 0 18px; pointer-events: auto; border: 1px solid var(--gold-deep); border-radius: 26px; background: rgba(8,8,10,0.8); color: var(--gold); font-size: 13px; font-weight: 700; letter-spacing: 0.16em; }
+.cardOpen { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 0; border: none; background: transparent; color: inherit; }
+.cardZoom { position: fixed; inset: 0; z-index: 60; background: rgba(8,8,10,0.94); display: flex; align-items: center; justify-content: center; }

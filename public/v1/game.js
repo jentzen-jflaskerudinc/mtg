@@ -253,6 +253,23 @@
         if (a.mins !== undefined) next.settings.mins = int(a.mins, 1, 30);
         next.turnStartedAt = now;
         break;
+      case 'swap': {
+        // move a whole seat (life, commanders, counters, damage taken and dealt) to another chair
+        const b = Number(a.to);
+        if (!needSeat() || !Number.isInteger(b) || b < 0 || b >= n || b === i) return null;
+        const map = (k) => (k === i ? b : k === b ? i : k);
+        [next.seats[i], next.seats[b]] = [next.seats[b], next.seats[i]];
+        next.seats.forEach((st) => {
+          const c = {};
+          for (const k of Object.keys(st.cmd)) c[map(Number(k))] = st.cmd[k];
+          st.cmd = c;
+        });
+        if (next.monarch >= 0) next.monarch = map(next.monarch);
+        if (next.initiative >= 0) next.initiative = map(next.initiative);
+        next.active = map(next.active);
+        next.extra = (next.extra || []).map(map);
+        break;
+      }
       case 'reset':
         next.seats = next.seats.map((s) => ({
           ...blankSeat(next.settings.life), name: s.name, cmdrs: s.cmdrs, owner: s.owner, connected: s.connected,
