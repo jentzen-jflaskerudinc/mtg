@@ -63,6 +63,7 @@
       initiative: -1,
       active: 0,
       round: 1,
+      extra: [], // extra-turn stack: last one added is taken first (rule 500.7)
       turnStartedAt: now,
       startedAt: now,
       rev: 0,
@@ -91,6 +92,8 @@
     const s = g.seats[i];
     const out = [];
     const stat = statusKinds(s).filter((f) => hasFlag(g, i, f.key)).map((f) => f.label);
+    const ex = extraCount(g, i);
+    if (ex) stat.push(ex > 1 ? 'EXTRA TURN ×' + ex : 'EXTRA TURN');
     if (stat.length) out.push({ label: 'STATUS', text: stat.join(' · ') });
     const ctr = [];
     const m = cmdMax(g, i);
@@ -101,7 +104,7 @@
   }
   function activeCount(g, i) {
     const s = g.seats[i];
-    let n = statusKinds(s).filter((f) => hasFlag(g, i, f.key)).length;
+    let n = statusKinds(s).filter((f) => hasFlag(g, i, f.key)).length + (extraCount(g, i) ? 1 : 0);
     if (cmdMax(g, i) > 0) n++;
     n += counterKinds(s).filter((k) => (s.ctr[k.key] || 0) > 0).length;
     return n;
@@ -110,9 +113,16 @@
     const n = g.seats.length;
     for (let step = 1; step <= n; step++) {
       const j = (g.active + step) % n;
-      if (!g.seats[j].out) return { seat: j, wrapped: j <= g.active };
+      if (!isDead(g, j)) return { seat: j, wrapped: j <= g.active };
     }
     return { seat: g.active, wrapped: false };
+  }
+  const extraCount = (g, i) => (g.extra || []).filter((x) => x === i).length;
+  // who plays next: a pending extra turn wins, otherwise the next living player to the left
+  function upNext(g) {
+    const stack = (g.extra || []).slice();
+    while (stack.length) { const j = stack.pop(); if (!isDead(g, j)) return { seat: j, extra: true }; }
+    return { seat: nextActive(g).seat, extra: false };
   }
   const seatLabel = (g, i) => (g.seats[i] && g.seats[i].name) || 'PLAYER ' + (i + 1);
 
@@ -129,7 +139,7 @@
     switch (a.type) {
       case 'life':
         if (!needSeat()) return null;
-        S.life = int(S.life + int(a.d, -999, 999), -999, 999);
+        S.life = int(S.life + int(a.d, -999, 999), 0, 999); // 0 life = out of the game
         break;
       case 'cmd': {
         const j = Number(a.from);
@@ -138,7 +148,7 @@
         const val = int(cur + int(a.d, -99, 99), 0, 99);
         if (val === cur) return null;
         S.cmd[j] = val;
-        S.life = int(S.life - (val - cur), -999, 999); // commander damage is also life loss
+        S.life = int(S.life - (val - cur), 0, 999); // commander damage is also life loss
         break;
       }
       case 'ctr': {
@@ -217,10 +227,25 @@
         }
         break;
       case 'endTurn': {
-        const nx = nextActive(next);
-        next.active = nx.seat;
-        if (nx.wrapped) next.round++;
+        next.extra = next.extra || [];
+        let took = false;
+        while (next.extra.length) {
+          const j = next.extra.pop();
+          if (!isDead(next, j)) { next.active = j; took = true; break; }
+        }
+        if (!took) {
+          const nx = nextActive(next);
+          next.active = nx.seat;
+          if (nx.wrapped) next.round++;
+        }
         next.turnStartedAt = now;
+        break;
+      }
+      case 'extra': {
+        if (!needSeat()) return null;
+        next.extra = next.extra || [];
+        if (int(a.d, -1, 1) > 0) { if (next.extra.length >= 10) return null; next.extra.push(i); }
+        else { const k = next.extra.lastIndexOf(i); if (k < 0) return null; next.extra.splice(k, 1); }
         break;
       }
       case 'timer':
@@ -237,6 +262,7 @@
         next.initiative = -1;
         next.active = 0;
         next.round = 1;
+        next.extra = [];
         next.turnStartedAt = now;
         next.startedAt = now;
         break;
@@ -274,7 +300,7 @@
       return {
         ...b,
         name: str(x.name, 24),
-        life: int(x.life, -999, 999),
+        life: int(x.life, 0, 999),
         cmd: nums(x.cmd, 99),
         ctr: nums(x.ctr, 999),
         shown: bools(x.shown),
@@ -300,6 +326,7 @@
       initiative: seatIdx(g.initiative),
       active: Math.max(0, seatIdx(g.active)),
       round: int(g.round, 1, 9999),
+      extra: Array.isArray(g.extra) ? g.extra.slice(-10).filter((v) => seatIdx(v) >= 0) : [],
       turnStartedAt: int(g.turnStartedAt, 0, 8.64e15),
       startedAt: int(g.startedAt, 0, 8.64e15),
       rev: int(g.rev, 0, 1e9),
@@ -309,6 +336,6 @@
   return {
     MAX_SEATS, COUNTERS, STATUSES, CODE_CHARS,
     makeCode, normSettings, newGame, apply, sanitize,
-    counterKinds, statusKinds, hasFlag, cmdMax, isDead, details, activeCount, nextActive, seatLabel,
+    counterKinds, statusKinds, hasFlag, cmdMax, isDead, details, activeCount, nextActive, upNext, extraCount, seatLabel,
   };
 });

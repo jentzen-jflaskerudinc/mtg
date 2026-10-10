@@ -138,7 +138,7 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 .menuHead { display: flex; align-items: center; gap: 12px; min-height: 56px; }
 .menuHead h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.2em; color: var(--bright); }
 .iconBtn { width: 56px; height: 56px; flex-shrink: 0; border: none; background: transparent; color: #E7DFCE; display: flex; align-items: center; justify-content: center; padding: 0; }
-.menuItem { width: 340px; min-height: 76px; padding: 8px 4px; box-sizing: border-box; border: none; border-bottom: var(--rule); box-shadow: var(--rule-glint); background: transparent; color: var(--bright); display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 4px; text-align: left; }
+.menuItem { width: 340px; min-height: 70px; padding: 6px 4px; box-sizing: border-box; border: none; border-bottom: var(--rule); box-shadow: var(--rule-glint); background: transparent; color: var(--bright); display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 4px; text-align: left; }
 .menuItem > span:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 18px; font-weight: 700; letter-spacing: 0.18em; }
 .concede { height: 72px; border: 1px solid #8A3A2C; border-radius: 8px; background: rgba(120,36,24,0.16); color: var(--red-soft); font-size: 18px; font-weight: 700; letter-spacing: 0.2em; }
 .concede.armed { border-color: #E0715B; background: rgba(170,52,34,0.32); }
@@ -224,5 +224,9 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 }
 .codeTag { display: inline-flex; align-items: center; gap: 10px; color: var(--gold-dim); }
 .codeTag b { font-weight: 400; font-size: 22px; letter-spacing: 0.16em; color: var(--white); }
-.viewToggle { position: absolute; top: 34px; left: 40px; z-index: 13; height: 56px; padding: 0 18px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--edge); border-radius: 28px; background: rgba(8,8,10,0.82); color: var(--gold); font-size: 15px; font-weight: 700; letter-spacing: 0.16em; box-shadow: 0 4px 14px rgba(0,0,0,0.7); }
+.viewToggle { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 10px; z-index: 40; height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--edge); border-radius: 28px; background: rgba(8,8,10,0.82); color: var(--gold); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; box-shadow: 0 4px 14px rgba(0,0,0,0.7); }
 .endTurn:disabled { filter: grayscale(0.5) brightness(0.62); cursor: default; animation: none; }
+.sitHere { position: absolute; z-index: 8; padding: 0; border: none; background: rgba(8,8,10,0.55); display: flex; align-items: center; justify-content: center; }
+.sitHere .goldBtn { height: 72px; pointer-events: none; }
+.sitBanner { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 40; padding: 10px 18px; border-radius: 20px; font-size: 12px !important; background: rgba(8,8,10,0.88); border: 1px solid var(--edge); color: var(--gold); font-size: 16px; font-weight: 700; letter-spacing: 0.16em; white-space: nowrap; }
+.movePill { position: absolute; top: 18px; left: 18px; height: 52px; padding: 0 18px; pointer-events: auto; border: 1px solid var(--gold-deep); border-radius: 26px; background: rgba(8,8,10,0.8); color: var(--gold); font-size: 13px; font-weight: 700; letter-spacing: 0.16em; }

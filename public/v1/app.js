@@ -109,6 +109,10 @@ function onServer(m) {
     const patch = { game: m.game };
     if (typeof m.seat === 'number') patch.seat = m.seat;
     set(patch);
+  } else if (m.t === 'error' && m.error) {
+    toast(m.error);
+  } else if (m.t === 'sat' && typeof m.seat === 'number') {
+    set({ seat: m.seat });
   } else if (m.t === 'kicked') {
     toast(m.error || 'The game ended');
     leaveGame();
@@ -121,7 +125,7 @@ function saveLocal() {
 }
 function dispatch(a) {
   if (!S.game || S.role === 'spectator' || S.role === 'tv') return;
-  if (S.role === 'player' && a.seat !== undefined && a.seat !== S.seat) return;
+  if (S.role === 'player' && S.seat < 0) return; // sit down first
   const next = MTG.apply(S.game, a);
   if (!next) return;
   set({ game: next });
@@ -238,6 +242,23 @@ const joinUrl = (code) => `${location.origin}/v1/#/join/${code}`;
 const tvUrl = (code) => `${location.origin}/v1/tv${code ? '#/tv/' + code : ''}`;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+// ---------- install as an app ----------
+const standalone = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let installEvt = null;
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; set({}); });
+addEventListener('appinstalled', () => { installEvt = null; toast('Installed. Open MTG from your home screen.'); });
+if (!PREVIEW && 'serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('/v1/sw.js', { scope: '/v1/' }).catch(() => {}));
+function InstallRow() {
+  useStore();
+  const [help, setHelp] = useState(false);
+  if (PREVIEW || standalone()) return null;
+  if (installEvt) return html`<button class="flatLink ruled" onClick=${async () => { const e = installEvt; installEvt = null; e.prompt(); try { await e.userChoice; } catch {} set({}); }}>
+    <span class="col">INSTALL THE APP<span>OPENS FULL SCREEN FROM YOUR HOME SCREEN</span></span><${Chevron} /></button>`;
+  return html`<button class="flatLink ruled" onClick=${() => setHelp(!help)}>
+    <span class="col">INSTALL THE APP<span>${help ? (isIOS ? 'IN SAFARI: TAP SHARE, THEN ADD TO HOME SCREEN' : 'IN CHROME: TAP ⋮, THEN ADD TO HOME SCREEN') : 'OPENS FULL SCREEN FROM YOUR HOME SCREEN'}</span></span><${Chevron} /></button>`;
+}
+
 // ---------- SETUP ----------
 function Setup() {
   const s = useStore().settings;
@@ -262,7 +283,8 @@ function Setup() {
       <div class="col" style="gap:18px;padding-top:22px">
         <div class="col" style="gap:0">
           <button class="flatLink ruled" onClick=${() => go('host')}><span class="col">HOST A GAME<span>PLAYERS JOIN FROM THEIR OWN PHONES</span></span><${Chevron} /></button>
-          <button class="flatLink" onClick=${() => go('join')}><span class="col">JOIN A GAME<span>ENTER A HOST'S GAME CODE</span></span><${Chevron} /></button>
+          <button class="flatLink ruled" onClick=${() => go('join')}><span class="col">JOIN A GAME<span>ENTER A HOST'S GAME CODE</span></span><${Chevron} /></button>
+          <${InstallRow} />
         </div>
         <button class="goldBtn goldTex" onClick=${startLocal}>START LOCAL GAME</button>
       </div>
@@ -397,6 +419,12 @@ function useDelta(life) {
 }
 
 function Seat({ g, i, q, onMenu, canEdit, showActive }) {
+  const nameRef = useRef(null);
+  const wasEdit = useRef(canEdit);
+  useEffect(() => {
+    if (canEdit && !wasEdit.current && i === S.seat && !g.seats[i].name && nameRef.current && S.role === 'player') nameRef.current.focus();
+    wasEdit.current = canEdit;
+  }, [canEdit, S.seat === i]);
   const s = g.seats[i];
   const delta = useDelta(s.life);
   const [name, setName] = useState(s.name);
@@ -415,9 +443,9 @@ function Seat({ g, i, q, onMenu, canEdit, showActive }) {
       ${art && html`<div class="seatArt" aria-hidden="true" style=${{ backgroundImage: `url("${art}")` }}></div>`}
       <div class="seatShade" aria-hidden="true"></div>
       ${showActive && html`<div class="activeEdge" aria-hidden="true"></div>`}
-      ${s.out && html`<div class="outVeil" aria-hidden="true">CONCEDED</div>`}
+      ${MTG.isDead(g, i) && html`<div class="outVeil" aria-hidden="true">${s.out ? 'CONCEDED' : 'DEFEATED'}</div>`}
       <div style=${`position:absolute;top:${compact ? 14 : 40}px;${centerPos};display:flex;justify-content:center;z-index:2`}>
-        ${!canEdit ? html`<div class="nameIn" style="display:flex;align-items:center;justify-content:center;border-color:rgba(201,162,39,0.3)">${MTG.seatLabel(g, i).toUpperCase()}</div>` : html`<input class="nameIn" type="text" aria-label="Player name" placeholder="Player Name" maxlength="24" value=${name}
+        ${!canEdit ? html`<div class="nameIn" style="display:flex;align-items:center;justify-content:center;border-color:rgba(201,162,39,0.3)">${MTG.seatLabel(g, i).toUpperCase()}</div>` : html`<input class="nameIn" ref=${nameRef} type="text" aria-label="Player name" placeholder="Player Name" maxlength="24" value=${name}
           onFocus=${() => { focused.current = true; }}
           onInput=${(e) => setName(e.target.value)}
           onBlur=${() => { focused.current = false; if (name !== s.name) d({ type: 'name', name }); }}
@@ -492,7 +520,7 @@ function Table() {
   return html`<${Stage} turnPortrait minRatio=${1.25} render=${(W, H) => {
     const quads = quadsFor(n, W, H);
     return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
-    ${quads.map((q, i) => html`<${Seat} key=${i} g=${g} i=${i} q=${q} canEdit=${true} showActive=${n > 1 && g.active === i && !g.seats[i].out} onMenu=${setMenu} />`)}
+    ${quads.map((q, i) => html`<${Seat} key=${i} g=${g} i=${i} q=${q} canEdit=${true} showActive=${n > 1 && g.active === i && !MTG.isDead(g, i)} onMenu=${setMenu} />`)}
     ${n > 1 && html`<${EndTurn} g=${g} x=${W / 2} y=${H / 2} enabled=${true} />`}
     ${n === 1 && timerOn && html`<${SoloClock} g=${g} />`}
     ${PREVIEW && html`<${PreviewBar} />`}
@@ -506,70 +534,58 @@ function SoloClock({ g }) {
 }
 
 // ---------- phone: just my seat ----------
-// grid for a phone: everyone upright, my seat editable; on a tall screen seats stack with End Turn in the middle
-function gridLayout(n, W, H, me) {
-  const m = 20, gap = 18;
-  if (W >= H) {
-    // wide screen: my seat fills the left, everyone else stacks on the right
-    if (n === 1) return { quads: [quadsAll(W, H).solo], et: null };
-    const lw = Math.round((W - 2 * m - gap) * 0.55), rw = W - 2 * m - gap - lw;
-    const others = n - 1, rh = (H - 2 * m - gap * (others - 1)) / others;
-    const quads = []; let r = 0;
-    for (let k = 0; k < n; k++) {
-      if (k === me) quads.push({ x: m, y: m, w: lw, h: H - 2 * m, rot: 0 });
-      else { quads.push({ x: m + lw + gap, y: m + r * (rh + gap), w: rw, h: rh, rot: 0 }); r++; }
-    }
-    return { quads, et: { x: m + lw - 150, y: m + 150, s: 0.8 } };
-  }
-  const strip = n > 1 ? 210 : 0;
-  const half = Math.ceil(n / 2);
-  const weight = (k) => (k === me ? 1.45 : 1);
-  let total = 0; for (let k = 0; k < n; k++) total += weight(k);
-  const avail = H - 2 * m - gap * (n - 1) - strip;
-  const quads = []; let y = m, etY = H / 2;
-  for (let k = 0; k < n; k++) {
-    const h = (avail * weight(k)) / total;
-    quads.push({ x: m, y, w: W - 2 * m, h, rot: 0 });
-    y += h + gap;
-    if (k === half - 1 && strip) { etY = y - gap / 2 + strip / 2; y += strip; }
-  }
-  return { quads, et: { x: W / 2, y: etY, s: 0.82 } };
-}
+// A phone that joined a game: the full table, exactly like the tablet (every seat, End Turn in the middle),
+// or just this player's seat. Before sitting down, open seats show SIT HERE.
 function PlayerView() {
   const st = useStore();
   const g = st.game;
   const i = st.seat;
+  const vp = useViewport();
   const [menu, setMenu] = useState(-1);
-  const [grid, setGrid] = useState(() => store.get('phoneGrid', false));
-  const flip = () => { store.set('phoneGrid', !grid); setGrid(!grid); };
-  if (!g || i < 0 || !g.seats[i]) return html`<${Waiting} text="CONNECTING…" />`;
+  const [gridPref, setGrid] = useState(() => store.get('phoneGrid', true));
+  const flip = () => { store.set('phoneGrid', !gridPref); setGrid(!gridPref); };
+  if (!g) return html`<${Waiting} text="CONNECTING…" />`;
+  const seated = i >= 0 && !!g.seats[i];
+  const grid = gridPref || !seated;
+  const sit = (k) => {
+    const old = S.seat, nm = old >= 0 && g.seats[old] ? g.seats[old].name : '';
+    set({ seat: k }); net.send({ t: 'sit', seat: k });
+    if (nm && !g.seats[k].name) { dispatch({ type: 'name', seat: k, name: nm }); dispatch({ type: 'name', seat: old, name: '' }); } // your name moves with you
+  };
   const n = g.seats.length;
-  const mine = g.active === i;
-  const toggle = html`<button class="viewToggle" onClick=${flip} aria-label=${grid ? 'Show only my seat' : 'Show all players'}>
-    ${grid ? html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>MY SEAT`
-      : html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"></rect><rect x="13" y="3" width="8" height="8" rx="1"></rect><rect x="3" y="13" width="8" height="8" rx="1"></rect><rect x="13" y="13" width="8" height="8" rx="1"></rect></svg>ALL PLAYERS`}</button>`;
+  const mine = seated && g.active === i;
+  const toggle = seated && html`<button class="viewToggle" onClick=${flip} aria-label=${grid ? 'Show only my seat' : 'Show all players'}>
+    ${grid ? html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>MY SEAT`
+      : html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"></rect><rect x="13" y="3" width="8" height="8" rx="1"></rect><rect x="3" y="13" width="8" height="8" rx="1"></rect><rect x="13" y="13" width="8" height="8" rx="1"></rect></svg>ALL PLAYERS`}</button>`;
+  const turned = vp.h > vp.w;
+  const overlay = html`${toggle}${!seated && html`<div class="sitBanner">TAP AN OPEN SEAT TO SIT DOWN</div>`}${!st.conn && html`<div class="connDot" title="Reconnecting"></div>`}`;
+  if (grid) {
+    return html`<${Stage} turnPortrait minRatio=${1.25} render=${(W, H) => {
+      const quads = quadsFor(n, W, H);
+      return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
+        ${quads.map((q, k) => html`<${Seat} key=${k} g=${g} i=${k} q=${q} canEdit=${seated} showActive=${n > 1 && g.active === k && !MTG.isDead(g, k)} onMenu=${setMenu} />`)}
+        ${quads.map((q, k) => k === i || g.seats[k].owner ? null : !seated
+          ? html`<button class="sitHere" style=${`left:${q.x}px;top:${q.y}px;width:${q.w}px;height:${q.h}px`} onClick=${() => sit(k)}>
+              <span class="goldBtn goldTex" style=${`width:auto;padding:0 34px;transform:rotate(${q.rot}deg)`}>SIT HERE</span></button>`
+          : html`<div style=${`position:absolute;left:${q.x}px;top:${q.y}px;width:${q.w}px;height:${q.h}px;transform:rotate(${q.rot}deg);pointer-events:none;z-index:8`}>
+              <button class="movePill" onClick=${() => sit(k)}>MOVE HERE</button></div>`)}
+        ${n > 1 && html`<${EndTurn} g=${g} x=${W / 2} y=${H / 2} enabled=${seated} />`}
+      </div>`;
+    }} />
+    ${overlay}
+    ${menu >= 0 && html`<${Menu} g=${g} i=${menu} rot=${turned ? 0 : seatRot(n, menu)} isHost=${false} onClose=${() => setMenu(-1)} />`}`;
+  }
   return html`<${Stage} min=${900} render=${(W, H) => {
     const tall = H > W;
-    if (grid) {
-      const L = gridLayout(n, W, H, i);
-      return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
-        ${L.quads.map((q, k) => html`<${Seat} key=${k} g=${g} i=${k} q=${q} canEdit=${k === i} showActive=${n > 1 && g.active === k && !g.seats[k].out} onMenu=${setMenu} />`)}
-        ${n > 1 && L.et && html`<div style=${`position:absolute;left:0;top:0;width:${W}px;height:${H}px;pointer-events:none;z-index:12`}>
-          <div style=${`position:absolute;left:${L.et.x}px;top:${L.et.y}px;transform:scale(${L.et.s});pointer-events:auto`}><${EndTurn} g=${g} x=${0} y=${0} enabled=${mine} /></div></div>`}
-        ${toggle}
-        ${!st.conn && html`<div class="connDot" title="Reconnecting"></div>`}
-      </div>`;
-    }
     const q = quadsAll(W, H).solo;
     return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
     <${Seat} g=${g} i=${i} q=${q} canEdit=${true} showActive=${mine} onMenu=${setMenu} />
     ${mine ? html`<${EndTurn} g=${g} x=${tall ? W / 2 : W - 190} y=${tall ? H - 270 : 210} enabled=${true} />`
       : html`<div class="sub" style=${`position:absolute;${tall ? 'bottom:120px;left:0;right:0;text-align:center' : 'top:44px;right:60px'};z-index:6;font-size:15px`}>${MTG.seatLabel(g, g.active).toUpperCase()}'S TURN</div>`}
-    ${toggle}
-    ${!st.conn && html`<div class="connDot" title="Reconnecting"></div>`}
   </div>`;
   }} />
-  ${menu >= 0 && html`<${Menu} g=${g} i=${i} rot=${0} isHost=${false} onClose=${() => setMenu(-1)} />`}`;
+  ${overlay}
+  ${menu >= 0 && html`<${Menu} g=${g} i=${menu} rot=${0} isHost=${false} onClose=${() => setMenu(-1)} />`}`;
 }
 function Waiting({ text }) {
   return html`<div class="tbl screen"><div class="tblBlur"></div><${Title} sub=${text} />
@@ -577,7 +593,7 @@ function Waiting({ text }) {
 }
 
 // ---------- menu ----------
-const HEAD = { '': 'MENU', add: 'COMMANDER', search: 'COMMANDER', cmd: 'COMMANDER DAMAGE', ctr: 'COUNTERS', status: 'STATUS', timer: 'TURN TIMER', host: 'HOSTED GAME' };
+const HEAD = { '': 'MENU', add: 'COMMANDER', search: 'COMMANDER', cmd: 'COMMANDER DAMAGE', ctr: 'COUNTERS', status: 'STATUS', extra: 'EXTRA TURNS', timer: 'TURN TIMER', host: 'HOSTED GAME' };
 function Menu({ g, i, rot, isHost, onClose }) {
   const st = useStore();
   const [tab, setTab] = useState('');
@@ -601,6 +617,8 @@ function Menu({ g, i, rot, isHost, onClose }) {
   }
   items.push({ label: 'COUNTERS', summary: ctrSum, t: 'ctr' });
   items.push({ label: 'STATUS', summary: statOn.map((f) => f.label).join(' · '), t: 'status' });
+  const exN = MTG.extraCount(g, i);
+  if (n > 1) items.push({ label: 'EXTRA TURN', summary: exN ? exN + (exN > 1 ? ' EXTRA TURNS QUEUED' : ' EXTRA TURN QUEUED') : '', t: 'extra' });
   if (isHost) {
     items.push({ label: 'TURN TIMER', summary: g.settings.timerOn ? g.settings.mins + ' MIN PER TURN' : 'OFF', t: 'timer' });
     items.push({ label: local ? 'TV DISPLAY' : 'HOSTED GAME', summary: g.code ? 'CODE ' + g.code + (g.locked ? ' · PASSWORD ON' : '') : (st.conn ? 'CONNECTING…' : 'OFFLINE'), t: 'host' });
@@ -634,7 +652,7 @@ function Menu({ g, i, rot, isHost, onClose }) {
       </div>
 
       ${tab === '' && html`
-        <div class="col" style="align-items:flex-start;gap:12px;padding:12px 0 8px">
+        <div class="col" style="align-items:flex-start;gap:8px;padding:8px 0 4px">
           ${items.map((it) => html`<button class="menuItem" onClick=${() => goTab(it.t)}><span>${it.label}<${Chevron} /></span><span class="subGold">${it.summary}</span></button>`)}
         </div>
         <div class="col" style="gap:8px;padding-top:16px;margin-top:auto">
@@ -706,6 +724,13 @@ function Menu({ g, i, rot, isHost, onClose }) {
           <button class="smallBtn" onClick=${() => { if (custom.trim()) { d({ type: 'customStatus', name: custom.trim() }); setCustom(''); setPick(false); } }}>ADD</button></div>
       </div>`}
 
+      ${tab === 'extra' && html`<div class="col" style="gap:10px;padding-top:20px">
+        <div class="row"><span class="col"><span class="lbl">EXTRA TURNS</span><span class="subGold">${exN ? 'NEXT UP AFTER THIS TURN' : 'NONE QUEUED'}</span></span>
+          <div class="stepper" style="margin-right:-14px"><button class="stepBtn lg" aria-label="Remove an extra turn" disabled=${!exN} onClick=${() => d({ type: 'extra', d: -1 })}>−</button>
+          <b class="stepVal" style="width:56px;font-size:40px">${exN}</b>
+          <button class="stepBtn lg" aria-label="Add an extra turn" onClick=${() => d({ type: 'extra', d: 1 })}>+</button></div></div>
+        <div class="hint">An extra turn starts as soon as the current turn ends. After it, play goes on to this player's left, the same as a normal turn. If several are queued, the most recent one is taken first.</div>
+      </div>`}
       ${tab === 'timer' && html`<div class="col" style="gap:10px;padding-top:20px">
         <div class="row"><span class="lbl">TURN TIMER</span><${Switch} label="Turn timer" on=${g.settings.timerOn} onToggle=${() => dispatch({ type: 'timer', on: !g.settings.timerOn })} /></div>
         <div class="row" style=${{ opacity: g.settings.timerOn ? 1 : 0.35 }}><span class="lbl">MIN PER TURN</span>
@@ -870,7 +895,8 @@ function Tv({ g }) {
     return () => removeEventListener('keydown', k);
   }, []);
   const rem = remaining(g, now);
-  const nextSeat = MTG.nextActive(g).seat;
+  const up = MTG.upNext(g);
+  const nextSeat = up.seat;
   return html`<${Stage} turnPortrait minRatio=${1.3} render=${(W, H) => {
     const quads = quadsFor(n, W, H);
     return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
@@ -882,8 +908,8 @@ function Tv({ g }) {
         <div style="position:absolute;left:0;right:0;top:-32px;height:63px;display:flex;justify-content:center">
           <div id="timerPlate" class=${rem !== null && rem <= 30 ? 'low' : ''}>${rem === null ? html`<span class="s">TURN ${g.round}</span>` : rem <= 0 ? html`<span class="s">TIME!</span>` : html`<span class="t">${fmt(rem)}</span>`}</div>
         </div>
-        ${nextSeat !== g.active && html`<div style="position:absolute;left:-90px;right:-90px;top:44px;display:flex;justify-content:center"><span class="hubTag">NEXT · ${MTG.seatLabel(g, nextSeat).toUpperCase()}</span></div>`}
-        ${g.code && html`<div style=${`position:absolute;left:-90px;right:-90px;top:${nextSeat !== g.active ? 86 : 44}px;display:flex;justify-content:center`}><${CodeTag} g=${g} /></div>`}
+        ${(nextSeat !== g.active || up.extra) && html`<div style="position:absolute;left:-90px;right:-90px;top:44px;display:flex;justify-content:center"><span class="hubTag">NEXT · ${MTG.seatLabel(g, nextSeat).toUpperCase()}${up.extra ? ' · EXTRA TURN' : ''}</span></div>`}
+        ${g.code && html`<div style=${`position:absolute;left:-90px;right:-90px;top:${nextSeat !== g.active || up.extra ? 86 : 44}px;display:flex;justify-content:center`}><${CodeTag} g=${g} /></div>`}
       </div>`}
       ${n === 1 && g.code && html`<div style="position:absolute;top:34px;right:44px;z-index:12"><${CodeTag} g=${g} /></div>`}
     ` : html`<${TvCommanders} g=${g} />`}
