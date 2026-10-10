@@ -67,6 +67,18 @@ function client() {
   phone.send({ t: 'sit', seat: 0 });
   await sleep(100);
   check('phone moves to seat 0 and frees seat 1', phone.seat === 0 && host.game.seats[0].owner === true && host.game.seats[1].owner === null);
+  phone.send({ t: 'act', a: { type: 'name', seat: 0, name: 'Jentzen' } });
+  phone.send({ t: 'act', a: { type: 'addCmdr', seat: 0, cmdr: { name: 'Atraxa' } } });
+  phone.send({ t: 'act', a: { type: 'life', seat: 0, d: -2 } });
+  await sleep(100);
+  phone.send({ t: 'sit', seat: 1 });
+  await sleep(100);
+  const s1 = host.game.seats[1];
+  check('moving takes name, commander and life along', s1.name === 'Jentzen' && s1.cmdrs[0].name === 'Atraxa' && s1.life === 28 && host.game.seats[0].name === '' && host.game.seats[0].life === 30);
+  phone.send({ t: 'sit', seat: 0 });
+  await sleep(100);
+  host.send({ t: 'act', a: { type: 'life', seat: 0, d: 2 } });
+  await sleep(80);
 
   phone.send({ t: 'act', a: { type: 'life', seat: 0, d: -4 } });
   await sleep(100);
@@ -79,12 +91,13 @@ function client() {
   phone.send({ t: 'act', a: { type: 'reset' } });
   await sleep(80);
   check("phone can't reset the game", host.game.seats[0].life === 26);
+  const a0 = host.game.active;
   phone.send({ t: 'act', a: { type: 'endTurn' } });
   await sleep(100);
-  check('active phone ends its turn', host.game.active === 1);
+  check('phone ends the turn', host.game.active === 1 - a0);
   phone.send({ t: 'act', a: { type: 'endTurn' } });
   await sleep(100);
-  check('any seated phone can press End Turn', host.game.active === 0);
+  check('any seated phone can press End Turn again', host.game.active === a0);
   host.send({ t: 'act', a: { type: 'life', seat: 1, d: -3 } });
   await sleep(100);
   check('host controls any seat', phone.game.seats[1].life === 27);

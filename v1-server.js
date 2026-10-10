@@ -71,7 +71,7 @@ function attachV1(server) {
     if (ws.role === 'host') return true;
     if (ws.role !== 'player' || ws.seat < 0) return false;
     // seated players run the table like the tablet does; only the host resets or changes the timer
-    return !['reset', 'timer'].includes(a.type);
+    return !['reset', 'timer', 'swap'].includes(a.type);
   }
 
   function onMessage(ws, m) {
@@ -142,11 +142,18 @@ function attachV1(server) {
         const room = ws.room;
         if (!room || room.mode !== 'hosted' || ws.role !== 'player') return;
         const k = Number(m.seat);
-        const seats = room.game.seats;
+        let seats = room.game.seats;
         if (!Number.isInteger(k) || k < 0 || k >= seats.length) return;
         if (seats[k].owner && seats[k].owner !== ws.clientId) return send(ws, { t: 'error', error: 'Someone already sat there' });
-        seats.forEach((s) => { if (s.owner === ws.clientId) s.owner = null; });
-        seats[k].owner = ws.clientId;
+        const from = seats.findIndex((s) => s.owner === ws.clientId);
+        if (from === k) return send(ws, { t: 'sat', seat: k });
+        if (from >= 0) {
+          // moving chairs: everything about this player (life, commanders, counters, damage) comes along
+          const moved = MTG.apply(room.game, { type: 'swap', seat: from, to: k }, now());
+          if (moved) room.game = moved;
+        } else {
+          seats[k].owner = ws.clientId;
+        }
         for (const c of room.clients) if (c.clientId === ws.clientId && c.role === 'player') c.seat = k;
         room.touched = now();
         send(ws, { t: 'sat', seat: k });
