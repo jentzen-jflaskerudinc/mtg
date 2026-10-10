@@ -224,3 +224,5 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 }
 .codeTag { display: inline-flex; align-items: center; gap: 10px; color: var(--gold-dim); }
 .codeTag b { font-weight: 400; font-size: 22px; letter-spacing: 0.16em; color: var(--white); }
+.viewToggle { position: absolute; top: 34px; left: 40px; z-index: 13; height: 56px; padding: 0 18px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--edge); border-radius: 28px; background: rgba(8,8,10,0.82); color: var(--gold); font-size: 15px; font-weight: 700; letter-spacing: 0.16em; box-shadow: 0 4px 14px rgba(0,0,0,0.7); }
+.endTurn:disabled { filter: grayscale(0.5) brightness(0.62); cursor: default; animation: none; }

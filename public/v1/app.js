@@ -409,41 +409,42 @@ function Seat({ g, i, q, onMenu, canEdit, showActive }) {
   const detPos = q.wide && !q.solo ? 'left: 60px; width: 520px' : 'left: 130px; right: 130px';
   const cmdr = g.settings.commander;
   const art = s.cmdrs[0] && (s.cmdrs[0].art || s.cmdrs[0].image);
+  const compact = q.h < 360;
   return html`<div class="seat" style=${`left:${q.x}px;top:${q.y}px;width:${q.w}px;height:${q.h}px`}>
     <div class="seatIn" style=${{ transform: q.rot ? 'rotate(180deg)' : 'none' }}>
       ${art && html`<div class="seatArt" aria-hidden="true" style=${{ backgroundImage: `url("${art}")` }}></div>`}
       <div class="seatShade" aria-hidden="true"></div>
       ${showActive && html`<div class="activeEdge" aria-hidden="true"></div>`}
       ${s.out && html`<div class="outVeil" aria-hidden="true">CONCEDED</div>`}
-      <div style=${`position:absolute;top:40px;${centerPos};display:flex;justify-content:center;z-index:2`}>
-        <input class="nameIn" type="text" aria-label="Player name" placeholder="Player Name" maxlength="24" value=${name} disabled=${!canEdit}
+      <div style=${`position:absolute;top:${compact ? 14 : 40}px;${centerPos};display:flex;justify-content:center;z-index:2`}>
+        ${!canEdit ? html`<div class="nameIn" style="display:flex;align-items:center;justify-content:center;border-color:rgba(201,162,39,0.3)">${MTG.seatLabel(g, i).toUpperCase()}</div>` : html`<input class="nameIn" type="text" aria-label="Player name" placeholder="Player Name" maxlength="24" value=${name}
           onFocus=${() => { focused.current = true; }}
           onInput=${(e) => setName(e.target.value)}
           onBlur=${() => { focused.current = false; if (name !== s.name) d({ type: 'name', name }); }}
-          onKeyDown=${(e) => { if (e.key === 'Enter') e.target.blur(); }} />
+          onKeyDown=${(e) => { if (e.key === 'Enter') e.target.blur(); }} />`}
       </div>
-      <div style=${`position:absolute;top:102px;${detPos};display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;z-index:2`}>
+      <div style=${`position:absolute;top:${compact ? 72 : 102}px;${detPos};display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;z-index:2`}>
         ${det.map((x) => html`<div class="detLine"><b>${x.label}</b><span> ${x.text}</span></div>`)}
       </div>
-      <button class="lifeZone" aria-label="Lose one life" style="left:0;padding:0 0 0 38px;text-align:left" onClick=${() => d({ type: 'life', d: -1 })}>−</button>
-      <button class="lifeZone" aria-label="Gain one life" style="right:0;padding:0 38px 0 0;text-align:right" onClick=${() => d({ type: 'life', d: 1 })}>+</button>
+      ${canEdit && html`<button class="lifeZone" aria-label="Lose one life" style="left:0;padding:0 0 0 38px;text-align:left" onClick=${() => d({ type: 'life', d: -1 })}>−</button>
+      <button class="lifeZone" aria-label="Gain one life" style="right:0;padding:0 38px 0 0;text-align:right" onClick=${() => d({ type: 'life', d: 1 })}>+</button>`}
       <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:2">
-        <span class="lifeNum" aria-live="polite" style=${q.solo ? 'font-size:230px' : null}>${s.life}</span>
+        <span class="lifeNum" aria-live="polite" style=${q.solo ? 'font-size:230px' : compact ? 'font-size:92px;margin-top:34px' : null}>${s.life}</span>
       </div>
       <div class="pete" style=${`position:absolute;top:calc(50% - ${q.solo ? 180 : 112}px);left:0;right:0;text-align:center;pointer-events:none;z-index:2;font-size:34px;color:${delta > 0 ? '#7FD08A' : '#E0715B'};text-shadow:0 2px 10px rgba(8,8,10,0.95)`}>${delta ? (delta > 0 ? '+' + delta : String(delta)) : ''}</div>
       <div style=${`position:absolute;top:calc(50% + ${q.solo ? 150 : 88}px);left:0;right:0;display:flex;justify-content:center;z-index:2`}>
-        <button class="burger" aria-label="Menu" onClick=${() => onMenu(i)}>
+        <button class="burger" aria-label="Menu" style=${canEdit ? null : { visibility: 'hidden' }} onClick=${() => onMenu(i)}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
           ${n > 0 && html`<span class="badge">${n}</span>`}
         </button>
       </div>
-      ${cmdr && html`<div style="position:absolute;bottom:12px;left:130px;right:130px;display:flex;align-items:center;justify-content:center;gap:4px;z-index:2">
-        <button class="taxBtn" aria-label="Remove commander tax" onClick=${() => d({ type: 'tax', d: -2 })}>−</button>
+      ${cmdr && (canEdit || s.tax > 0) && html`<div style="position:absolute;bottom:12px;left:130px;right:130px;display:flex;align-items:center;justify-content:center;gap:4px;z-index:2">
+        ${canEdit && html`<button class="taxBtn" aria-label="Remove commander tax" onClick=${() => d({ type: 'tax', d: -2 })}>−</button>`}
         <div style="min-width:96px;display:flex;align-items:baseline;justify-content:center;gap:8px;pointer-events:none"><span class="sub" style="letter-spacing:0.2em">TAX</span><b class="pete" style="font-size:32px;line-height:1;color:var(--bright)">${s.tax}</b></div>
-        <button class="taxBtn" aria-label="Add commander tax" onClick=${() => d({ type: 'tax', d: 2 })}>+</button>
+        ${canEdit && html`<button class="taxBtn" aria-label="Add commander tax" onClick=${() => d({ type: 'tax', d: 2 })}>+</button>`}
       </div>`}
-      <button class="five" style="left:18px" onClick=${() => d({ type: 'life', d: -5 })}>−5</button>
-      <button class="five" style="right:18px" onClick=${() => d({ type: 'life', d: 5 })}>+5</button>
+      ${canEdit && html`<button class="five" style="left:18px" onClick=${() => d({ type: 'life', d: -5 })}>−5</button>
+      <button class="five" style="right:18px" onClick=${() => d({ type: 'life', d: 5 })}>+5</button>`}
     </div>
     <div class="seatFrame frame9" aria-hidden="true"></div>
   </div>`;
@@ -505,20 +506,66 @@ function SoloClock({ g }) {
 }
 
 // ---------- phone: just my seat ----------
+// grid for a phone: everyone upright, my seat editable; on a tall screen seats stack with End Turn in the middle
+function gridLayout(n, W, H, me) {
+  const m = 20, gap = 18;
+  if (W >= H) {
+    // wide screen: my seat fills the left, everyone else stacks on the right
+    if (n === 1) return { quads: [quadsAll(W, H).solo], et: null };
+    const lw = Math.round((W - 2 * m - gap) * 0.55), rw = W - 2 * m - gap - lw;
+    const others = n - 1, rh = (H - 2 * m - gap * (others - 1)) / others;
+    const quads = []; let r = 0;
+    for (let k = 0; k < n; k++) {
+      if (k === me) quads.push({ x: m, y: m, w: lw, h: H - 2 * m, rot: 0 });
+      else { quads.push({ x: m + lw + gap, y: m + r * (rh + gap), w: rw, h: rh, rot: 0 }); r++; }
+    }
+    return { quads, et: { x: m + lw - 150, y: m + 150, s: 0.8 } };
+  }
+  const strip = n > 1 ? 210 : 0;
+  const half = Math.ceil(n / 2);
+  const weight = (k) => (k === me ? 1.45 : 1);
+  let total = 0; for (let k = 0; k < n; k++) total += weight(k);
+  const avail = H - 2 * m - gap * (n - 1) - strip;
+  const quads = []; let y = m, etY = H / 2;
+  for (let k = 0; k < n; k++) {
+    const h = (avail * weight(k)) / total;
+    quads.push({ x: m, y, w: W - 2 * m, h, rot: 0 });
+    y += h + gap;
+    if (k === half - 1 && strip) { etY = y - gap / 2 + strip / 2; y += strip; }
+  }
+  return { quads, et: { x: W / 2, y: etY, s: 0.82 } };
+}
 function PlayerView() {
   const st = useStore();
   const g = st.game;
   const i = st.seat;
   const [menu, setMenu] = useState(-1);
+  const [grid, setGrid] = useState(() => store.get('phoneGrid', false));
+  const flip = () => { store.set('phoneGrid', !grid); setGrid(!grid); };
   if (!g || i < 0 || !g.seats[i]) return html`<${Waiting} text="CONNECTING…" />`;
+  const n = g.seats.length;
   const mine = g.active === i;
+  const toggle = html`<button class="viewToggle" onClick=${flip} aria-label=${grid ? 'Show only my seat' : 'Show all players'}>
+    ${grid ? html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>MY SEAT`
+      : html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"></rect><rect x="13" y="3" width="8" height="8" rx="1"></rect><rect x="3" y="13" width="8" height="8" rx="1"></rect><rect x="13" y="13" width="8" height="8" rx="1"></rect></svg>ALL PLAYERS`}</button>`;
   return html`<${Stage} min=${900} render=${(W, H) => {
-    const q = quadsAll(W, H).solo;
     const tall = H > W;
+    if (grid) {
+      const L = gridLayout(n, W, H, i);
+      return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
+        ${L.quads.map((q, k) => html`<${Seat} key=${k} g=${g} i=${k} q=${q} canEdit=${k === i} showActive=${n > 1 && g.active === k && !g.seats[k].out} onMenu=${setMenu} />`)}
+        ${n > 1 && L.et && html`<div style=${`position:absolute;left:0;top:0;width:${W}px;height:${H}px;pointer-events:none;z-index:12`}>
+          <div style=${`position:absolute;left:${L.et.x}px;top:${L.et.y}px;transform:scale(${L.et.s});pointer-events:auto`}><${EndTurn} g=${g} x=${0} y=${0} enabled=${mine} /></div></div>`}
+        ${toggle}
+        ${!st.conn && html`<div class="connDot" title="Reconnecting"></div>`}
+      </div>`;
+    }
+    const q = quadsAll(W, H).solo;
     return html`<div class="tbl" style=${`position:relative;width:${W}px;height:${H}px;overflow:hidden`}>
     <${Seat} g=${g} i=${i} q=${q} canEdit=${true} showActive=${mine} onMenu=${setMenu} />
     ${mine ? html`<${EndTurn} g=${g} x=${tall ? W / 2 : W - 190} y=${tall ? H - 270 : 210} enabled=${true} />`
       : html`<div class="sub" style=${`position:absolute;${tall ? 'bottom:120px;left:0;right:0;text-align:center' : 'top:44px;right:60px'};z-index:6;font-size:15px`}>${MTG.seatLabel(g, g.active).toUpperCase()}'S TURN</div>`}
+    ${toggle}
     ${!st.conn && html`<div class="connDot" title="Reconnecting"></div>`}
   </div>`;
   }} />
