@@ -4,7 +4,8 @@
   "description": "Real-time MTG Commander life tracker: phones control, TV displays",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build:v1": "esbuild public/v1/app.js --bundle --format=iife --target=chrome58 --outfile=public/v1/app.bundle.js && esbuild public/v1/game.js --target=chrome58 --outfile=public/v1/game.compat.js"
   },
   "engines": {
     "node": ">=18"
@@ -12,5 +13,8 @@
   "dependencies": {
     "express": "^4.19.2",
     "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.23.1"
   }
 }
