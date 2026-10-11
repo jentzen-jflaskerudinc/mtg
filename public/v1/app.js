@@ -843,7 +843,8 @@ function CounterSearch({ seat, onPick }) {
         const names = new Set();
         for (const c of j.data || []) {
           const text = [c.oracle_text, ...(c.card_faces || []).map((f) => f.oracle_text)].join(' ').toLowerCase();
-          for (const m of text.matchAll(/([+\-]\d\/[+\-]\d|[a-z][a-z-]*(?: strike)?) counters?\b/g)) {
+          const re = /([+\-]\d\/[+\-]\d|[a-z][a-z-]*(?: strike)?) counters?\b/g;
+          for (let m = re.exec(text); m; m = re.exec(text)) {
             const nm = m[1];
             if (nm.includes(term) && !['a', 'an', 'the', 'that', 'those', 'of', 'more', 'each', 'any', 'all', 'no', 'its', 'his', 'her', 'their', 'additional', 'those', 'kind', 'many', 'x', 'two', 'three', 'four', 'five', 'one'].includes(nm)) names.add(nm);
           }
@@ -990,7 +991,7 @@ function TvSeat({ g, i, q }) {
   </div>`;
 }
 function TvCommanders({ g }) {
-  return html`<div style="position:absolute;inset:0">
+  return html`<div style="position:absolute;top:0;right:0;bottom:0;left:0">
     <div style="position:absolute;top:62px;right:0;left:0;text-align:center">
       <div style="font-size:27px;font-weight:700;letter-spacing:0.22em;color:var(--bright)">COMMANDERS</div>
       <div style="margin-top:10px;font-size:13px;letter-spacing:0.24em;color:var(--muted)">◀ ▶ ON THE REMOTE TO SWITCH PAGES</div>
@@ -1047,7 +1048,7 @@ function Motes({ g, quads, W = 1586, H = 992 }) {
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
   }, []);
-  return html`<canvas ref=${ref} width=${W} height=${H} style="position:absolute;inset:0;z-index:7;pointer-events:none"></canvas>`;
+  return html`<canvas ref=${ref} width=${W} height=${H} style="position:absolute;top:0;left:0;z-index:7;pointer-events:none"></canvas>`;
 }
 
 // TV entry: type the code with the remote, or arrive with /v1/tv#/tv/CODE

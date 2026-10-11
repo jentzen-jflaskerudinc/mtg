@@ -36,7 +36,7 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 
 /* ---------- textures ---------- */
 .tbl { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / 100% 100% no-repeat; }
-.tblBlur { position: absolute; inset: -8px; pointer-events: none; background: var(--ink) url(../tablet-assets/table-bg.jpg) center / 100% 100% no-repeat; filter: blur(1.5px) brightness(0.68); }
+.tblBlur { position: absolute; top: -8px; right: -8px; bottom: -8px; left: -8px; pointer-events: none; background: var(--ink) url(../tablet-assets/table-bg.jpg) center / 100% 100% no-repeat; filter: blur(1.5px) brightness(0.68); }
 .frame9 { border: 34px solid transparent; border-image: url(assets/frame9.png) 72 stretch; }
 .mgrCard { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover no-repeat; background-origin: border-box; background-clip: border-box; }
 .goldTex {
@@ -57,17 +57,17 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 @media (prefers-reduced-motion: reduce) { .endGlow { animation: none; } }
 
 /* ---------- card screens (setup / host / join) ---------- */
-.screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 30px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
-  padding: max(28px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); box-sizing: border-box; }
+.screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; gap: 30px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 28px 16px; padding: max(28px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); box-sizing: border-box; }
 .screen > .titleBlock { margin-top: auto; }
 .screen > .card { margin-bottom: auto; }
 .screen > .tblBlur { position: fixed; }
 .titleBlock { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; text-shadow: 0 2px 12px rgba(0,0,0,0.95); }
-.titleBlock h1 { margin: 0; font-size: clamp(20px, 5.4vw, 30px); text-align: center; font-weight: 700; letter-spacing: 0.18em; color: var(--bright); white-space: nowrap; }
+.titleBlock h1 { margin: 0; font-size: 30px; font-size: clamp(20px, 5.4vw, 30px); text-align: center; font-weight: 700; letter-spacing: 0.18em; color: var(--bright); white-space: nowrap; }
 .titleSub { display: flex; align-items: center; gap: 12px; padding-top: 6px; font-size: 13px; font-weight: 700; letter-spacing: 0.3em; color: var(--gold); }
 .titleSub i { width: 48px; height: 1px; background: linear-gradient(90deg, rgba(201,162,39,0), #C9A227); }
 .titleSub i:last-child { background: linear-gradient(90deg, #C9A227, rgba(201,162,39,0)); }
-.card { position: relative; z-index: 1; width: min(620px, 100%); flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.9); }
+.card { position: relative; z-index: 1; width: 620px; max-width: 100%; width: min(620px, 100%); flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.9); }
 .cardBody { padding: 6px 20px 8px; display: flex; flex-direction: column; gap: 10px; }
 
 .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 84px; padding: 8px 0; border-bottom: var(--rule); box-shadow: var(--rule-glint); }
@@ -105,10 +105,10 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 
 /* ---------- table / seats ---------- */
 .seat { position: absolute; overflow: hidden; background: rgba(10,10,12,0.45); }
-.seatIn { position: absolute; inset: 0; }
-.seatShade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,8,10,0.62) 0%, rgba(8,8,10,0.30) 30%, rgba(8,8,10,0.30) 70%, rgba(8,8,10,0.62) 100%), radial-gradient(ellipse at center, rgba(8,8,10,0.18) 40%, rgba(8,8,10,0.60) 100%); }
-.seatArt { position: absolute; inset: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9); }
-.seatFrame { position: absolute; inset: 0; box-sizing: border-box; pointer-events: none; z-index: 4; }
+.seatIn { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.seatShade { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(180deg, rgba(8,8,10,0.62) 0%, rgba(8,8,10,0.30) 30%, rgba(8,8,10,0.30) 70%, rgba(8,8,10,0.62) 100%), radial-gradient(ellipse at center, rgba(8,8,10,0.18) 40%, rgba(8,8,10,0.60) 100%); }
+.seatArt { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center 20%; filter: saturate(0.95) brightness(0.9); }
+.seatFrame { position: absolute; top: 0; right: 0; bottom: 0; left: 0; box-sizing: border-box; pointer-events: none; z-index: 4; }
 .nameIn { width: 320px; height: 52px; box-sizing: border-box; padding: 0 14px; text-align: center; border: 1px solid rgba(201,162,39,0.6); border-radius: 8px; background: rgba(8,8,10,0.72); color: var(--bright); font-size: 20px; font-weight: 700; letter-spacing: 0.09em; }
 .nameIn:focus { outline: none; border-color: var(--gold); }
 .detLine { max-width: 100%; font-size: 12px; line-height: 1.35; letter-spacing: 0.1em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 6px rgba(8,8,10,0.95); }
@@ -122,8 +122,8 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 .taxBtn { width: 64px; height: 56px; padding: 0; border: none; background: transparent; color: var(--gold); font-size: 38px; line-height: 1; text-shadow: 0 2px 10px rgba(8,8,10,0.9); }
 .burger { position: relative; width: 76px; height: 76px; padding: 0; border: none; background: transparent; color: var(--gold); display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.95)); }
 .badge { position: absolute; top: -4px; right: -4px; min-width: 28px; height: 28px; padding: 0 6px; box-sizing: border-box; border-radius: 14px; background: var(--gold-deep); color: #1a1305; font-family: 'Peteroy', Georgia, serif; font-size: 18px; line-height: 28px; text-align: center; }
-.outVeil { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: rgba(8,8,10,0.74); display: flex; align-items: flex-start; justify-content: center; padding-top: 150px; box-sizing: border-box; font-size: 40px; font-weight: 900; letter-spacing: 0.3em; color: var(--muted); text-shadow: 0 2px 12px rgba(0,0,0,0.9); }
-.activeEdge { position: absolute; inset: 0; pointer-events: none; z-index: 3; box-shadow: inset 0 0 0 3px rgba(201,162,39,0.55), inset 0 0 70px rgba(201,162,39,0.22); }
+.outVeil { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; pointer-events: none; background: rgba(8,8,10,0.74); display: flex; align-items: flex-start; justify-content: center; padding-top: 150px; box-sizing: border-box; font-size: 40px; font-weight: 900; letter-spacing: 0.3em; color: var(--muted); text-shadow: 0 2px 12px rgba(0,0,0,0.9); }
+.activeEdge { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; z-index: 3; box-shadow: inset 0 0 0 3px rgba(201,162,39,0.55), inset 0 0 70px rgba(201,162,39,0.22); }
 
 .endTurn { position: relative; width: 224px; height: 224px; padding: 0; border: 1.5px solid #1a1305; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #140D02; }
 .endTurn .who { position: absolute; top: 40px; left: 14px; right: 14px; text-align: center; font-size: 13px; font-weight: 900; letter-spacing: 0.14em; color: #2a1c04; text-shadow: 0 1px 0 rgba(255,244,208,0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -133,7 +133,7 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 .endTurn.pressed { transform: translateY(3px) scale(0.96); }
 
 /* ---------- menu modal ---------- */
-.veil { position: absolute; inset: 0; z-index: 30; background: rgba(8,8,10,0.88); display: flex; align-items: center; justify-content: center; }
+.veil { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; background: rgba(8,8,10,0.88); display: flex; align-items: center; justify-content: center; }
 .menu { width: 560px; flex-shrink: 0; box-sizing: border-box; border: 1px solid var(--edge); border-radius: 16px; padding: 28px 28px 32px; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 0 60px rgba(0,0,0,0.9); overflow-y: auto; }
 .menuHead { display: flex; align-items: center; gap: 12px; min-height: 56px; }
 .menuHead h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.2em; color: var(--bright); }
@@ -170,7 +170,7 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 .tvSeat .pName { max-width: 440px; padding: 4px 22px; border-radius: 24px; background: rgba(8,8,10,0.72); border: 1px solid rgba(201,162,39,0.5); color: var(--white); font-size: 30px; font-weight: 700; letter-spacing: 0.1em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 10px rgba(8,8,10,0.9); }
 .tvSeat.active .pName { background: linear-gradient(180deg, #f2d783 0%, #c9a227 60%, #8f6c1c 100%); color: #1a1305; text-shadow: none; border-color: #1a1305; }
 .tvSeat .cmdName { height: 28px; line-height: 28px; text-align: center; color: #D9C08A; font-size: 17px; font-weight: 700; letter-spacing: 0.09em; text-shadow: 0 2px 10px rgba(8,8,10,0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.activeGlow { position: absolute; inset: 0; opacity: 0; transition: opacity 0.4s ease; box-shadow: inset 0 0 0 4px #C9A227, inset 0 0 90px rgba(201,162,39,0.38); pointer-events: none; z-index: 3; }
+.activeGlow { position: absolute; top: 0; right: 0; bottom: 0; left: 0; opacity: 0; transition: opacity 0.4s ease; box-shadow: inset 0 0 0 4px #C9A227, inset 0 0 90px rgba(201,162,39,0.38); pointer-events: none; z-index: 3; }
 .tvSeat.active .activeGlow { opacity: 1; animation: glowPulse 2.6s ease-in-out infinite; }
 @keyframes glowPulse { 50% { box-shadow: inset 0 0 0 4px #E8C96A, inset 0 0 120px rgba(232,201,106,0.5); } }
 .tvSeat.dead .seatArt { filter: grayscale(1) brightness(0.4); }
@@ -231,4 +231,4 @@ html { background: var(--ink) url(../tablet-assets/table-bg.jpg) center / cover 
 .sitBanner { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 40; padding: 10px 18px; border-radius: 20px; font-size: 12px !important; background: rgba(8,8,10,0.88); border: 1px solid var(--edge); color: var(--gold); font-size: 16px; font-weight: 700; letter-spacing: 0.16em; white-space: nowrap; }
 .movePill { position: absolute; top: 18px; left: 18px; height: 52px; padding: 0 18px; pointer-events: auto; border: 1px solid var(--gold-deep); border-radius: 26px; background: rgba(8,8,10,0.8); color: var(--gold); font-size: 13px; font-weight: 700; letter-spacing: 0.16em; }
 .cardOpen { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 0; border: none; background: transparent; color: inherit; }
-.cardZoom { position: fixed; inset: 0; z-index: 60; background: rgba(8,8,10,0.94); display: flex; align-items: center; justify-content: center; }
+.cardZoom { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 60; background: rgba(8,8,10,0.94); display: flex; align-items: center; justify-content: center; }
